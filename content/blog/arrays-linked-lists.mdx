@@ -1,0 +1,185 @@
+---
+title: "Arrays and Linked Lists: The Building Blocks of DSA"
+date: "2023-07-25"
+tags: ["Data Structures", "Algorithms", "JavaScript", "Computer Science"]
+description: "Understand the fundamental concepts of arrays and linked lists, their operations, performance characteristics, and when to use each in practical scenarios."
+thumbnailImage: "/blog/thumbnails/arrays-linked-lists-thumb.png"
+thumbnailBlurDataURL: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8XA8AAksBZG7L2GIAAAAASUVORK5CYII="
+heroImage: "/blog/heroes/arrays-linked-lists-hero.png"
+heroBlurDataURL: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8XA8AAksBZG7L2GIAAAAASUVORK5CYII="
+series:
+  title: "Data Structures & Algorithms in Practice"
+  slug: "dsa-in-practice"
+  part: 1
+  description: "Master essential data structures and algorithms with practical examples and clear explanations. Build a strong foundation for efficient problem-solving."
+  heroImage: "/blog/series-thumbnails/dsa-in-practice-hero.png"
+  heroBlurDataURL: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8XA8AAksBZG7L2GIAAAAASUVORK5CYII="
+---
+
+Arrays and linked lists are two of the most fundamental data structures in computer science. They serve as the building blocks for many more complex structures and algorithms. Understanding their characteristics, operations, and trade-offs is crucial for any aspiring software engineer.
+
+## Arrays
+
+An array is a contiguous block of memory that stores elements of the same data type. Think of it like a numbered list of boxes, where each box can hold one item, and you can directly access any box if you know its number (index).
+
+### Key Characteristics:
+- **Fixed Size (in some languages):** Traditionally, arrays have a fixed size defined at creation. Dynamic arrays (like JavaScript arrays or Python lists) can resize, but this might involve creating a new, larger array and copying elements, which can be costly.
+- **Contiguous Memory:** Elements are stored one after another in memory. This allows for efficient calculation of an element's memory address.
+- **Direct Access (Random Access):** Elements can be accessed directly using their index in O(1) time complexity. For example, `myArray[5]`.
+- **Homogeneous Elements:** Typically store elements of the same data type, though some dynamic languages are more flexible.
+
+### Common Operations:
+- **Accessing an element:** `array[i]` - O(1)
+- **Updating an element:** `array[i] = newValue` - O(1)
+- **Searching for an element:**
+    - Linear search (unsorted array): O(n)
+    - Binary search (sorted array): O(log n)
+- **Inserting an element:** O(n) in the worst case (e.g., inserting at the beginning requires shifting all other elements).
+- **Deleting an element:** O(n) in the worst case (e.g., deleting from the beginning).
+
+### JavaScript Example:
+\`\`\`javascript
+let fruits = ["Apple", "Banana", "Cherry"];
+
+// Access
+console.log(fruits[1]); // "Banana"
+
+// Update
+fruits[0] = "Apricot";
+console.log(fruits); // ["Apricot", "Banana", "Cherry"]
+
+// Add to end (amortized O(1) for dynamic arrays)
+fruits.push("Date");
+console.log(fruits); // ["Apricot", "Banana", "Cherry", "Date"]
+
+// Add to beginning (O(n))
+fruits.unshift("Elderberry");
+console.log(fruits); // ["Elderberry", "Apricot", "Banana", "Cherry", "Date"]
+
+// Remove from end (O(1) for dynamic arrays)
+fruits.pop();
+console.log(fruits); // ["Elderberry", "Apricot", "Banana", "Cherry"]
+
+// Remove from beginning (O(n))
+fruits.shift();
+console.log(fruits); // ["Apricot", "Banana", "Cherry"]
+\`\`\`
+
+### Pros:
+- Fast random access.
+- Cache-friendly due to contiguous memory.
+
+### Cons:
+- Slow insertion and deletion (especially at the beginning or middle).
+- Can be wasteful if a fixed-size array is underutilized, or costly to resize dynamic arrays frequently.
+
+## Linked Lists
+
+A linked list is a linear data structure where elements are not stored at contiguous memory locations. Instead, each element (called a "node") contains data and a pointer (or link) to the next node in the sequence. The list is accessed starting from the first node, called the "head".
+
+### Key Characteristics:
+- **Dynamic Size:** Linked lists can easily grow or shrink as needed.
+- **Non-Contiguous Memory:** Nodes can be scattered anywhere in memory.
+- **Sequential Access:** To access an element, you must traverse the list from the head, following the pointers. This means accessing the Nth element takes O(N) time.
+- **Nodes:** Each node typically contains:
+    - `data`: The actual value stored.
+    - `next`: A pointer to the next node in the list (or `null` if it's the last node).
+
+### Types of Linked Lists:
+1.  **Singly Linked List:** Each node points only to the next node. Traversal is unidirectional.
+2.  **Doubly Linked List:** Each node points to both the next node and the previous node. Traversal can be bidirectional. This makes some operations (like deleting a specific node or inserting before a node) more efficient if you have a pointer to that node.
+3.  **Circular Linked List:** The last node's `next` pointer points back to the head node, forming a circle.
+
+### Common Operations (Singly Linked List):
+- **Accessing an element (Nth element):** O(N)
+- **Searching for an element:** O(N)
+- **Inserting an element:**
+    - At the beginning (prepend): O(1)
+    - At the end (append): O(N) without a tail pointer, O(1) with a tail pointer.
+    - In the middle: O(N) to find the insertion point.
+- **Deleting an element:**
+    - From the beginning (delete head): O(1)
+    - From the end: O(N) to find the second-to-last node.
+    - In the middle: O(N) to find the node before the one to be deleted.
+
+### JavaScript Example (Singly Linked List):
+\`\`\`javascript
+class Node {
+  constructor(data) {
+    this.data = data;
+    this.next = null;
+  }
+}
+
+class LinkedList {
+  constructor() {
+    this.head = null;
+    this.size = 0;
+  }
+
+  // Add to front
+  prepend(data) {
+    const newNode = new Node(data);
+    newNode.next = this.head;
+    this.head = newNode;
+    this.size++;
+  }
+
+  // Add to end
+  append(data) {
+    const newNode = new Node(data);
+    if (!this.head) {
+      this.head = newNode;
+    } else {
+      let current = this.head;
+      while (current.next) {
+        current = current.next;
+      }
+      current.next = newNode;
+    }
+    this.size++;
+  }
+
+  // Print list data
+  printList() {
+    let current = this.head;
+    const elements = [];
+    while (current) {
+      elements.push(current.data);
+      current = current.next;
+    }
+    console.log(elements.join(" -> "));
+  }
+}
+
+const list = new LinkedList();
+list.append(10);
+list.append(20);
+list.prepend(5);
+list.printList(); // Output: 5 -> 10 -> 20
+console.log("Size:", list.size); // Output: Size: 3
+\`\`\`
+
+### Pros:
+- Efficient insertion and deletion (especially at the ends or if you have a pointer to the node).
+- Dynamic size, no wasted memory.
+
+### Cons:
+- Slow random access (O(N)).
+- Requires extra memory for pointers.
+- Not cache-friendly as nodes can be scattered.
+
+## When to Use Which?
+
+- **Arrays are generally preferred when:**
+    - You need frequent random access to elements.
+    - The number of elements is relatively stable or known beforehand.
+    - Memory is a concern, and you want to minimize overhead (pointers in linked lists add overhead).
+    - Cache performance is critical.
+
+- **Linked Lists are generally preferred when:**
+    - You need frequent insertions and deletions, especially at the beginning or end.
+    - The number of elements is highly dynamic and unpredictable.
+    - You are implementing other data structures like stacks, queues, or hash tables (chaining).
+
+Understanding these fundamental differences will help you make informed decisions when choosing the right data structure for your specific problem, leading to more efficient and effective code.

@@ -1,0 +1,106 @@
+---
+title: "Git & GitHub for Beginners: A Practical Introduction"
+date: "2024-06-22"
+readTime: "8 min read"
+tag: "Version Control"
+description: "Learn the basics of Git for version control and GitHub for collaboration. Understand essential commands and workflows to manage your coding projects effectively."
+thumbnailImage: "/blog/thumbnails/git-github-beginners-thumb.png"
+series: { 
+  title: "Web Development Fundamentals", 
+  part: 2, 
+  slug: "web-dev-fundamentals" 
+  # No need to repeat series.description here, it will be picked from part 1
+}
+toc:
+  - { title: "What is Version Control?", href: "#what-is-version-control", icon: "History" }
+  - { title: "Introducing Git", href: "#introducing-git", icon: "GitBranch" }
+  - { title: "Core Git Concepts", href: "#core-concepts", icon: "Key" }
+  - { title: "Essential Git Commands", href: "#essential-commands", icon: "Terminal" }
+  - { title: "What is GitHub?", href: "#what-is-github", icon: "Github" }
+  - { title: "Basic GitHub Workflow", href: "#github-workflow", icon: "Workflow" }
+  - { title: "Why Bother?", href: "#why-bother", icon: "Lightbulb" }
+prevPost: { title: "A Developer's Guide to REST APIs", href: "/blog/rest-api-guide" }
+nextPost: null
+---
+
+## What is Version Control? {#what-is-version-control}
+
+Imagine you're writing a long document or a complex piece of code. You make changes, save it, then realize you made a mistake and want to go back to an older version. Or, what if multiple people are working on the same project? How do you manage everyone's contributions without overwriting each other's work?
+
+**Version Control Systems (VCS)** solve these problems. They track changes to files over time, allowing you to revert to previous versions, compare changes, and collaborate effectively.
+
+## Introducing Git {#introducing-git}
+
+**Git** is a powerful, free, and open-source distributed version control system. "Distributed" means that every developer working with a Git repository has a full copy of the project's history on their local machine. This makes it fast and allows for offline work.
+
+Git is the most widely used VCS in the world, especially in software development.
+
+## Core Git Concepts {#core-concepts}
+
+*   **Repository (Repo):** A directory containing your project files and a hidden `.git` subfolder that stores all the version history.
+*   **Commit:** A snapshot of your project's changes at a specific point in time. Each commit has a unique ID and a message describing the changes.
+*   **Branch:** A parallel line of development. You can create branches to work on new features or fixes without affecting the main codebase (often called `main` or `master`).
+*   **Merge:** Combining changes from one branch into another.
+*   **Working Directory:** The files and folders you see in your project.
+*   **Staging Area (Index):** A place where you prepare changes before committing them. You select which modifications you want to include in the next commit.
+*   **HEAD:** A pointer that usually refers to the currently checked-out commit, typically the tip of the current branch.
+
+## Essential Git Commands {#essential-commands}
+
+Here are some fundamental Git commands you'll use frequently (run these in your project's directory via the terminal):
+
+*   `git init`: Initializes a new Git repository in the current directory.
+*   `git clone <repository_url>`: Creates a local copy of a remote repository.
+*   `git status`: Shows the current state of your working directory and staging area.
+*   `git add <file_name>` or `git add .`: Adds changes from your working directory to the staging area. (`.` adds all changes).
+*   `git commit -m "Your descriptive message"`: Saves the staged changes to the repository with a message.
+*   `git log`: Shows the commit history.
+*   `git branch <branch_name>`: Creates a new branch.
+*   `git checkout <branch_name>` or `git switch <branch_name>`: Switches to a different branch.
+*   `git merge <branch_name>`: Merges the specified branch into the current branch.
+*   `git pull`: Fetches changes from a remote repository and merges them into your current local branch.
+*   `git push`: Sends your local committed changes to a remote repository.
+
+## What is GitHub? {#what-is-github}
+
+While Git is the version control tool, **GitHub** is a web-based platform that provides hosting for Git repositories. It adds a layer of collaboration and project management features on top of Git, such as:
+
+*   **Remote Repositories:** A central place to store your project and share it with others.
+*   **Pull Requests (PRs):** A way to propose changes to a repository. Team members can review the changes, discuss them, and then merge them if approved.
+*   **Issue Tracking:** Managing bugs, feature requests, and tasks.
+*   **Project Boards:** Kanban-style boards for organizing work.
+*   **Wikis:** For documentation.
+*   **GitHub Actions:** For automating workflows like testing and deployment.
+
+Other similar platforms include GitLab and Bitbucket.
+
+## Basic GitHub Workflow {#github-workflow}
+
+A common workflow for contributing to a project on GitHub:
+
+1.  **Fork** the repository (create your own copy on GitHub).
+2.  **Clone** your forked repository to your local machine.
+3.  Create a new **branch** for your changes.
+4.  Make your changes, **add** and **commit** them locally.
+5.  **Push** your branch to your forked repository on GitHub.
+6.  Open a **Pull Request** from your branch to the original repository's main branch.
+7.  Discuss and review the changes.
+8.  Once approved, the project maintainer **merges** your Pull Request.
+
+## Why Bother? {#why-bother}
+
+Learning Git and GitHub (or a similar platform) is essential for:
+
+*   **Tracking History:** Never lose work and easily revert to previous states.
+*   **Collaboration:** Work effectively with teams of any size.
+*   **Experimentation:** Safely try out new ideas on branches without breaking the main project.
+*   **Showcasing Your Work:** GitHub is a popular way for developers to build a portfolio.
+*   **Industry Standard:** Most software companies use Git.
+
+Mastering these tools will significantly boost your productivity and make you a more effective developer. Byteskill encourages all aspiring tech professionals to get comfortable with version control early in their journey!
+\`\`\`
+\`\`\`
+
+**3. Update `app/series/page.tsx`**
+
+Modify the series card to display the description.

@@ -1,0 +1,47 @@
+---
+title: "Pathfinding Visualizer (A* Algorithm)"
+date: "2024-05-20"
+readTime: "4 min read"
+description: "An interactive web application that visualizes pathfinding algorithms like A*, Dijkstra's, and Breadth-First Search on a grid."
+heroImage: "/projects/pathfinding-visualizer-hero.png"
+demoUrl: "#" # Replace with actual demo if available
+repoUrl: "#" # Replace with actual repo
+tags: ["Algorithm Visualization", "React", "JavaScript", "HTML5 Canvas"]
+toc:
+  - { title: "Core Idea", href: "#core-idea", icon: "Lightbulb" }
+  - { title: "Algorithms Implemented", href: "#algorithms", icon: "ListChecks" }
+  - { title: "Tech Stack", href: "#tech-stack", icon: "Settings" }
+  - { title: "Key Features", href: "#features", icon: "Zap" }
+features:
+  - { text: "Interactive grid for creating walls/obstacles" }
+  - { text: "Real-time visualization of algorithm exploration" }
+  - { text: "Supports A*, Dijkstra's, BFS, DFS algorithms" }
+  - { text: "Adjustable animation speed" }
+  - { text: "Clear indication of shortest path found" }
+  - { text: "Responsive design for various screen sizes" }
+license: "MIT"
+slug: "pathfinding-visualizer"
+longDescription: |
+  This project, developed at Byteskill, aims to demystify common pathfinding algorithms by providing a clear, interactive visualization. Users can draw obstacles on a grid, select an algorithm, and watch it find the shortest path between a start and end node.
+---
+
+## Core Idea {#core-idea}
+Understanding how pathfinding algorithms explore a search space can be challenging from theory alone. This visualizer brings algorithms like A* to life, showing step-by-step how they make decisions to find the optimal route.
+
+## Algorithms Implemented {#algorithms}
+*   **A\* Search:** An informed search algorithm that uses heuristics to guide its search towards the goal more efficiently.
+*   **Dijkstra's Algorithm:** Finds the shortest path between nodes in a graph, works well for weighted graphs.
+*   **Breadth-First Search (BFS):** An uninformed search algorithm that explores neighbor nodes first before moving to the next level neighbors. Guarantees the shortest path in unweighted graphs.
+*   **Depth-First Search (DFS):** Explores as far as possible along each branch before backtracking. Does not guarantee the shortest path.
+
+## Tech Stack {#tech-stack}
+*   **Frontend:** React (or Vanilla JavaScript for a simpler version)
+*   **Graphics:** HTML5 Canvas or SVG for rendering the grid and animations
+*   **Styling:** Tailwind CSS (or plain CSS)
+
+<Callout iconName="Info" variant="info" title="Learning Focus">
+The primary goal was to solidify understanding of these algorithms and data structures like Priority Queues (for A* and Dijkstra's).
+</Callout>
+\`\`\`
+
+\`\`\`

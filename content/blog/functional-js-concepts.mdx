@@ -1,0 +1,159 @@
+---
+title: "Functional Programming Concepts in JavaScript"
+date: "2024-07-15" 
+readTime: "10 min read"
+tag: "JavaScript"
+description: "Explore core functional programming concepts like pure functions, immutability, higher-order functions, and composition, and learn how to apply them in JavaScript."
+thumbnailImage: "/blog/thumbnails/functional-js-concepts-thumb.png"
+series: { 
+  title: "Modern JavaScript Essentials", 
+  part: 4, 
+  slug: "modern-js-essentials"
+}
+toc:
+  - { title: "What is Functional Programming?", href: "#what-is-fp", icon: "FunctionSquare" }
+  - { title: "Pure Functions", href: "#pure-functions", icon: "Droplet" }
+  - { title: "Immutability", href: "#immutability", icon: "Shield" }
+  - { title: "Higher-Order Functions", href: "#higher-order-functions", icon: "Layers" }
+  - { title: "Function Composition", href: "#function-composition", icon: "Link" }
+  - { title: "Currying", href: "#currying", icon: "SplitSquareHorizontal" }
+  - { title: "Benefits of FP in JS", href: "#benefits-fp", icon: "ThumbsUp" }
+  - { title: "Conclusion", href: "#conclusion", icon: "Sparkles" }
+prevPost: { title: "JavaScript Objects and Prototypes In-Depth", href: "/blog/js-objects-prototypes" }
+nextPost: { title: "Understanding Arrays and Linked Lists", href: "/blog/arrays-linked-lists" } # Updated nextPost
+---
+
+## What is Functional Programming? {#what-is-fp}
+Functional Programming (FP) is a programming paradigm that treats computation as the evaluation of mathematical functions and avoids changing-state and mutable data. It emphasizes writing code with:
+*   **Pure Functions:** Functions that, given the same input, always return the same output and have no side effects.
+*   **Immutability:** Data structures that cannot be changed after they are created.
+*   **First-Class and Higher-Order Functions:** Functions are treated like any other variable and can be passed as arguments, returned from other functions, and assigned to variables.
+*   **Function Composition:** Building complex functions by combining simpler ones.
+
+JavaScript, being a multi-paradigm language, supports many functional programming concepts.
+
+## Pure Functions {#pure-functions}
+A function is pure if:
+1.  Its return value is solely determined by its input values.
+2.  It has no side effects (e.g., modifying external variables, logging to console, writing to a file, DOM manipulation).
+
+\`\`\`javascript
+// Pure function
+function add(a, b) {
+  return a + b;
+}
+
+// Impure function (modifies external state)
+let total = 0;
+function addToTotal(value) {
+  total += value; // Side effect: modifies 'total'
+  return total;
+}
+\`\`\`
+Pure functions are easier to test, reason about, and parallelize.
+
+## Immutability {#immutability}
+Immutability means that once data is created, it cannot be changed. If you need to modify data, you create a new copy with the changes.
+
+\`\`\`javascript
+// Mutable approach (modifying original array)
+const numbersMut = [1, 2, 3];
+// numbersMut.push(4); // Modifies original
+// console.log(numbersMut); // [1, 2, 3, 4]
+
+// Immutable approach (creating new array)
+const numbersImmut = [1, 2, 3];
+const newNumbers = [...numbersImmut, 4]; // Create new array with spread operator
+console.log(numbersImmut); // [1, 2, 3] (original is unchanged)
+console.log(newNumbers);   // [1, 2, 3, 4]
+
+const person = { name: "Byteskill", age: 1 };
+const updatedPerson = { ...person, age: 2 }; // Create new object
+console.log(person);        // { name: 'Byteskill', age: 1 }
+console.log(updatedPerson); // { name: 'Byteskill', age: 2 }
+\`\`\`
+Immutability helps prevent unintended side effects and makes state management more predictable, especially in complex applications. Libraries like Immer can help manage immutable state more easily.
+
+## Higher-Order Functions {#higher-order-functions}
+A higher-order function is a function that either:
+1.  Takes one or more functions as arguments.
+2.  Returns a function as its result.
+
+Common examples in JavaScript include `map`, `filter`, and `reduce` on arrays.
+
+\`\`\`javascript
+const numbers = [1, 2, 3, 4, 5];
+
+// map: applies a function to each element and returns a new array
+const doubled = numbers.map(num => num * 2); // [2, 4, 6, 8, 10]
+
+// filter: returns a new array with elements that pass a test
+const evens = numbers.filter(num => num % 2 === 0); // [2, 4]
+
+// reduce: applies a function against an accumulator and each element to reduce it to a single value
+const sum = numbers.reduce((accumulator, currentValue) => accumulator + currentValue, 0); // 15
+
+// Function that returns a function
+function multiplyBy(factor) {
+  return function(number) {
+    return number * factor;
+  };
+}
+const triple = multiplyBy(3);
+console.log(triple(5)); // 15
+\`\`\`
+
+## Function Composition {#function-composition}
+Function composition is the process of combining two or more functions to produce a new function or perform some computation. The output of one function becomes the input of the next.
+
+\`\`\`javascript
+const compose = (f, g) => (x) => f(g(x));
+
+const toUpperCase = (str) => str.toUpperCase();
+const exclaim = (str) => \`\${str}!\`;
+
+const shout = compose(exclaim, toUpperCase);
+console.log(shout("hello byteskill")); // "HELLO BYTESKILL!"
+\`\`\`
+Composition helps build complex logic from small, reusable, and testable functions.
+
+## Currying {#currying}
+Currying is the technique of transforming a function that takes multiple arguments into a sequence of functions that each take a single argument.
+
+\`\`\`javascript
+// Non-curried function
+const addMulti = (a, b, c) => a + b + c;
+
+// Curried version
+const addCurried = (a) => (b) => (c) => a + b + c;
+
+console.log(addCurried(1)(2)(3)); // 6
+
+const add5 = addCurried(5);
+const add5And3 = add5(3);
+console.log(add5And3(2)); // 10
+\`\`\`
+Currying can lead to more reusable and specialized functions.
+
+<Callout iconName="Info" variant="tip" title="Partial Application">
+Currying is related to, but distinct from, partial application. Partial application involves fixing a number of arguments to a function, producing another function of smaller arity. Currying always produces unary (single-argument) functions.
+</Callout>
+
+## Benefits of FP in JS {#benefits-fp}
+*   **Predictability:** Pure functions and immutability make code easier to reason about.
+*   **Testability:** Pure functions are easy to test as their output depends only on input.
+*   **Reusability:** Small, pure functions can be composed to build complex logic.
+*   **Concurrency:** Immutability and lack of side effects simplify concurrent programming.
+*   **Readability:** Declarative style can make code easier to understand (once familiar with FP concepts).
+
+## Conclusion {#conclusion}
+Incorporating functional programming principles into your JavaScript code can lead to more robust, maintainable, and elegant solutions. While JavaScript isn't a purely functional language, its support for first-class functions and features like arrow functions and array methods make it well-suited for adopting an FP style where beneficial. This concludes our "Modern JavaScript Essentials" series!
+\`\`\`
+\`\`\`
+
+**2. Define and Generate the Hero Image for the New Series**
+
+**3. Define and Generate Thumbnail Images for the New Posts**
+
+**4. Create the First MDX File for "Data Structures & Algorithms in Practice" (Part 1)**
+This post will define the new series' description and its hero image.

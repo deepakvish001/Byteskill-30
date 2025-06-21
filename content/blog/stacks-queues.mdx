@@ -1,0 +1,160 @@
+---
+title: "Exploring Stacks and Queues"
+date: "2024-07-25" # New date
+readTime: "6 min read"
+tag: "Data Structures"
+description: "Dive into stacks (LIFO) and queues (FIFO), two essential abstract data types. Learn their operations, implementations, and common applications in programming."
+thumbnailImage: "/blog/thumbnails/stacks-queues-thumb.png"
+series: { 
+  title: "Data Structures & Algorithms in Practice", 
+  part: 2, 
+  slug: "dsa-in-practice"
+}
+toc:
+  - { title: "Abstract Data Types (ADTs)", href: "#adts", icon: "BoxSelect" }
+  - { title: "Stacks: Last-In, First-Out (LIFO)", href: "#stacks-lifo", icon: "Layers" }
+  - { title: "Stack Operations & Implementation", href: "#stack-operations", icon: "Settings" }
+  - { title: "Queues: First-In, First-Out (FIFO)", href: "#queues-fifo", icon: "ArrowRightLeft" }
+  - { title: "Queue Operations & Implementation", href: "#queue-operations", icon: "Settings" }
+  - { title: "Applications of Stacks and Queues", href: "#applications", icon: "ClipboardList" }
+  - { title: "Conclusion", href: "#conclusion", icon: "CheckSquare" }
+prevPost: { title: "Understanding Arrays and Linked Lists", href: "/blog/arrays-linked-lists" }
+nextPost: null # This is currently the last post in this new series
+---
+
+## Abstract Data Types (ADTs) {#adts}
+Before diving into stacks and queues, it's helpful to understand Abstract Data Types (ADTs). An ADT is a mathematical model for data types. It defines a set of operations without specifying how these operations are implemented. Stacks and queues are classic examples of ADTs.
+
+## Stacks: Last-In, First-Out (LIFO) {#stacks-lifo}
+A **stack** is a linear data structure that follows the **LIFO (Last-In, First-Out)** principle. The last element added to the stack is the first one to be removed. Think of a stack of plates: you add a plate to the top, and you remove a plate from the top.
+
+Key terms:
+*   **Push:** Adding an element to the top of the stack.
+*   **Pop:** Removing an element from the top of the stack.
+*   **Peek (or Top):** Viewing the top element without removing it.
+*   **isEmpty:** Checking if the stack is empty.
+
+## Stack Operations & Implementation {#stack-operations}
+Stacks can be implemented using arrays or linked lists.
+
+**Using an Array (JavaScript):**
+\`\`\`javascript
+class Stack {
+  constructor() {
+    this.items = [];
+  }
+
+  push(element) {
+    this.items.push(element);
+  }
+
+  pop() {
+    if (this.isEmpty()) {
+      return "Underflow"; // Or throw an error
+    }
+    return this.items.pop();
+  }
+
+  peek() {
+    if (this.isEmpty()) {
+      return "Stack is empty";
+    }
+    return this.items[this.items.length - 1];
+  }
+
+  isEmpty() {
+    return this.items.length === 0;
+  }
+
+  size() {
+    return this.items.length;
+  }
+}
+
+const myStack = new Stack();
+myStack.push(10);
+myStack.push(20);
+console.log(myStack.peek()); // 20
+console.log(myStack.pop());  // 20
+console.log(myStack.size()); // 1
+\`\`\`
+All primary stack operations (push, pop, peek, isEmpty) typically have a time complexity of **O(1)** when implemented with a dynamic array or linked list.
+
+## Queues: First-In, First-Out (FIFO) {#queues-fifo}
+A **queue** is a linear data structure that follows the **FIFO (First-In, First-Out)** principle. The first element added to the queue is the first one to be removed. Think of a line of people waiting for a bus: the first person in line is the first one to get on the bus.
+
+Key terms:
+*   **Enqueue (or Add):** Adding an element to the rear (end) of the queue.
+*   **Dequeue (or Remove):** Removing an element from the front of the queue.
+*   **Peek (or Front):** Viewing the front element without removing it.
+*   **isEmpty:** Checking if the queue is empty.
+
+## Queue Operations & Implementation {#queue-operations}
+Queues can also be implemented using arrays or linked lists.
+
+**Using an Array (JavaScript - simple, less efficient for dequeue):**
+\`\`\`javascript
+class Queue {
+  constructor() {
+    this.items = [];
+  }
+
+  enqueue(element) {
+    this.items.push(element); // Add to rear
+  }
+
+  dequeue() {
+    if (this.isEmpty()) {
+      return "Underflow"; // Or throw an error
+    }
+    return this.items.shift(); // Remove from front (O(n) for arrays)
+  }
+
+  peek() {
+    if (this.isEmpty()) {
+      return "Queue is empty";
+    }
+    return this.items[0];
+  }
+
+  isEmpty() {
+    return this.items.length === 0;
+  }
+
+  size() {
+    return this.items.length;
+  }
+}
+
+const myQueue = new Queue();
+myQueue.enqueue(100);
+myQueue.enqueue(200);
+console.log(myQueue.peek());    // 100
+console.log(myQueue.dequeue()); // 100
+console.log(myQueue.size());    // 1
+\`\`\`
+<Callout iconName="TriangleAlert" variant="warning" title="Array Implementation Note">
+Using `shift()` for dequeue in an array-based queue is O(n) because all subsequent elements need to be shifted. For high-performance queues, a linked list or a circular array (more complex) is often preferred, allowing O(1) for both enqueue and dequeue.
+</Callout>
+
+Using a linked list for a queue (with pointers to both head and tail) allows for O(1) enqueue and dequeue operations.
+
+## Applications of Stacks and Queues {#applications}
+**Stacks:**
+*   Function call management (call stack).
+*   Undo/Redo functionality in software.
+*   Expression evaluation (e.g., converting infix to postfix).
+*   Backtracking algorithms (e.g., maze solving, parsers).
+*   Browser history navigation (back button).
+
+**Queues:**
+*   Managing requests in servers (e.g., print queues, web server request handling).
+*   Breadth-First Search (BFS) in graph algorithms.
+*   Task scheduling in operating systems.
+*   Buffering data (e.g., streaming video).
+*   Message queues in distributed systems.
+
+## Conclusion {#conclusion}
+Stacks and queues are simple yet powerful ADTs with numerous applications in computer science. Understanding their LIFO and FIFO behaviors and how to implement their core operations is essential for any programmer. They serve as building blocks for more complex algorithms and systems.
+\`\`\`
+\`\`\`

@@ -1,0 +1,96 @@
+---
+title: "A Developer's Guide to REST APIs"
+date: "2024-06-20"
+readTime: "7 min read"
+tag: "Web Development"
+description: "Understand the fundamentals of REST APIs, including core principles, HTTP methods, status codes, and how to interact with them using practical examples."
+thumbnailImage: "/blog/thumbnails/rest-api-guide-thumb.png"
+series: { 
+  title: "Web Development Fundamentals", 
+  part: 1, 
+  slug: "web-dev-fundamentals",
+  description: "A comprehensive guide to the core concepts and technologies that power the modern web. Perfect for beginners and those looking to solidify their understanding.",
+  heroImage: "/blog/series-thumbnails/web-dev-fundamentals-hero.png" # Added series hero image
+}
+toc:
+  - { title: "What is an API?", href: "#what-is-an-api", icon: "Share2" }
+  - { title: "The Principles of REST", href: "#rest-principles", icon: "ListChecks" }
+  - { title: "Key Components of a REST API Request", href: "#key-components", icon: "FileText" }
+  - { title: "Common HTTP Methods (Verbs)", href: "#http-methods", icon: "Zap" }
+  - { title: "Understanding Status Codes", href: "#status-codes", icon: "Info" }
+  - { title: "Practical Example: Fetching Data", href: "#practical-example", icon: "Code" }
+prevPost: { title: "Top 5 VS Code Extensions for Python Developers", href: "/blog/vscode-python-extensions" }
+nextPost: { title: "Git & GitHub for Beginners: A Practical Introduction", href: "/blog/git-github-beginners" }
+---
+
+## What is an API? {#what-is-an-api}
+
+An **API (Application Programming Interface)** is a set of rules and protocols that allows different software applications to communicate with each other. It defines the methods and data formats that applications can use to request and exchange information. Think of it as a waiter in a restaurant: you (the client) don't go into the kitchen (the server) yourself; you give your order to the waiter (the API), who communicates with the kitchen and brings back your food (the data).
+
+## The Principles of REST {#rest-principles}
+
+**REST (Representational State Transfer)** is an architectural style for designing networked applications. It's not a standard or protocol, but a set of constraints to follow when creating web services. An API that adheres to these principles is called a **RESTful API**.
+
+The key principles are:
+
+1.  **Client-Server Architecture:** The client (e.g., your web browser) and the server (where the data lives) are separate. This separation of concerns allows them to evolve independently.
+2.  **Statelessness:** Each request from a client to a server must contain all the information needed to understand and complete the request. The server does not store any client context between requests.
+3.  **Cacheability:** Responses from the server should be defined as cacheable or non-cacheable. This helps improve performance and scalability.
+4.  **Uniform Interface:** This is the fundamental principle of REST and simplifies the architecture. It promotes loose coupling between the client and server, allowing them to evolve independently.
+    *   **Resource-based:** Individual resources (e.g., a user, a product) are identified by URIs (e.g., `/users/123`).
+    *   **Manipulation of resources through representations:** The client interacts with a representation of the resource (e.g., a JSON object).
+    *   **Self-descriptive messages:** Each message includes enough information to describe how to process it.
+
+## Key Components of a REST API Request {#key-components}
+
+A typical request consists of:
+
+*   **Endpoint:** The URL you are requesting (e.g., `https://api.byteskill.com/articles`).
+*   **Method:** The type of request you are making (e.g., GET, POST, PUT, DELETE).
+*   **Headers:** Additional information for the server, like authentication tokens (e.g., `Authorization: Bearer <token>`), the desired response format (e.g., `Accept: application/json`), or the format of the request body (e.g., `Content-Type: application/json`).
+*   **Body (or Data):** The data you are sending to the server, typically used with POST, PUT, or PATCH requests.
+
+## Common HTTP Methods (Verbs) {#http-methods}
+
+RESTful APIs use standard HTTP methods to perform actions (CRUD - Create, Read, Update, Delete):
+
+*   **GET:** Retrieve a resource. (Read)
+*   **POST:** Create a new resource. (Create)
+*   **PUT:** Update/replace an existing resource completely. (Update)
+*   **PATCH:** Partially update an existing resource. (Update)
+*   **DELETE:** Remove a resource. (Delete)
+
+## Understanding Status Codes {#status-codes}
+
+The server responds with a status code to indicate the outcome of the request.
+
+*   **2xx (Success):** `200 OK`, `201 Created`
+*   **3xx (Redirection):** `301 Moved Permanently`
+*   **4xx (Client Error):** `400 Bad Request`, `401 Unauthorized`, `404 Not Found`
+*   **5xx (Server Error):** `500 Internal Server Error`
+
+## Practical Example: Fetching Data {#practical-example}
+
+Here's how you might use the `fetch` API in JavaScript to get data from a REST API:
+
+\`\`\`javascript
+async function getArticles() {
+  try {
+    const response = await fetch('https://api.byteskill.com/articles');
+
+    if (!response.ok) {
+      // Handle HTTP errors like 404 or 500
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const articles = await response.json(); // Parse the JSON response
+    console.log(articles);
+  } catch (error) {
+    console.error('Could not fetch articles:', error);
+  }
+}
+
+getArticles();
+\`\`\`
+
+Understanding REST APIs is a fundamental skill for modern software development, enabling applications to leverage services and data from across the web.

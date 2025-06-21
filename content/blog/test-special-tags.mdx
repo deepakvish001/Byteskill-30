@@ -1,0 +1,25 @@
+---
+title: "Testing Special Characters in Tags"
+date: "2024-06-18"
+description: "A test post to verify how special characters like C++, React & Redux, and café are handled in tags and slugs."
+author: "v0"
+tags: ["C++", "React & Redux", "café", "Node.js", "  leading & trailing spaces  ", "multi---hyphens", "_underscores_test_"]
+slug: "test-special-tags"
+thumbnailImage: "/placeholder.svg?width=400&height=200"
+heroImage: "/placeholder.svg?width=1000&height=400"
+---
+
+This post is designed to test the `normalizeTagForSlug` function and the overall tag handling system with various special characters and edge cases.
+
+We expect the following transformations for the slugs:
+
+*   `C++` should become `c` (or `cpp` if you prefer to map it, current logic makes it `c`)
+*   `React & Redux` should become `react-redux`
+*   `café` should become `cafe`
+*   `Node.js` should become `node.js`
+*   `  leading & trailing spaces  ` should become `leading-trailing-spaces`
+*   `multi---hyphens` should become `multi-hyphens`
+*   `_underscores_test_` should become `underscores_test_` (or `underscores-test` if you modify `normalizeTagForSlug` to replace underscores)
+
+The display names on the post page and on the `/tags` page should retain their original casing and characters.
+\`\`\`

@@ -1,0 +1,52 @@
+---
+title: "Stock Price Prediction Model"
+date: "2024-06-01"
+readTime: "3 min read"
+description: "A machine learning project that uses time-series analysis and an LSTM neural network to predict future stock prices based on historical data."
+heroImage: "/projects/stock-price-predictor-hero.png"
+demoUrl: "#"
+repoUrl: "#"
+tags: ["Machine Learning", "Python", "TensorFlow", "LSTM", "Data Science"]
+toc:
+  - { title: "Project Overview", href: "#overview", icon: "Target" }
+  - { title: "Technology Stack", href: "#tech-stack", icon: "Layers" }
+  - { title: "Methodology", href: "#methodology", icon: "BrainCircuit" }
+  - { title: "Key Features", href: "#features", icon: "Zap" }
+features:
+  - { text: "Fetches historical stock data using an API (e.g., yfinance)" }
+  - { text: "Preprocesses and scales data for the neural network" }
+  - { text: "Builds and trains an LSTM (Long Short-Term Memory) model" }
+  - { text: "Predicts future stock prices based on a sequence of past data" }
+  - { text: "Visualizes historical vs. predicted prices using Matplotlib" }
+license: "MIT"
+slug: "stock-price-predictor"
+longDescription: |
+  This Byteskill project dives into the world of financial data science by attempting to predict stock market movements. It leverages a Long Short-Term Memory (LSTM) neural network, a type of recurrent neural network (RNN) well-suited for time-series data, to learn patterns from historical stock prices and forecast future trends.
+---
+
+## Project Overview {#overview}
+The goal of this project is to build and train a machine learning model that can predict the closing price of a stock for the next day. This serves as a practical application of time-series forecasting and deep learning concepts.
+
+<Callout iconName="TriangleAlert" variant="warning" title="Disclaimer">
+This project is for educational purposes only and should not be used for actual financial trading. Stock markets are highly volatile and influenced by numerous factors beyond historical prices.
+</Callout>
+
+## Technology Stack {#tech-stack}
+*   **Language:** Python
+*   **Data Manipulation:** Pandas, NumPy
+*   **Data Fetching:** `yfinance` library
+*   **Machine Learning:** TensorFlow with Keras API
+*   **Data Scaling:** Scikit-learn (`MinMaxScaler`)
+*   **Visualization:** Matplotlib
+
+## Methodology {#methodology}
+1.  **Data Collection:** Historical stock data (Open, High, Low, Close, Volume) is fetched for a specific ticker (e.g., 'AAPL', 'GOOGL').
+2.  **Data Preprocessing:** The 'Close' price is selected. The data is scaled to a range (typically 0 to 1) to help the neural network converge better.
+3.  **Train/Test Split:** The historical data is split into a training set (used to train the model) and a testing set (used to evaluate its performance on unseen data).
+4.  **Create Training Data:** The data is transformed into sequences. For example, use the last 60 days of data (`X`) to predict the 61st day's price (`y`).
+5.  **Model Building:** An LSTM model is constructed using Keras. It consists of multiple LSTM layers with Dropout layers to prevent overfitting, and a final Dense layer to produce the predicted price.
+6.  **Training:** The model is compiled with an optimizer (like 'adam') and a loss function ('mean_squared_error') and trained on the prepared dataset.
+7.  **Evaluation & Prediction:** The model's performance is evaluated on a separate test dataset, and its predictions are plotted against the actual prices to visualize its accuracy.
+\`\`\`
+
+\`\`\`

@@ -1,0 +1,63 @@
+---
+title: "Introduction to Neural Networks"
+date: "2024-06-05"
+readTime: "8 min read"
+tag: "AI/ML"
+description: "A beginner-friendly introduction to the core concepts of neural networks, the building blocks of deep learning."
+thumbnailImage: "/blog/thumbnails/neural-networks-thumb.png"
+toc:
+  - { title: "What is a Neural Network?", href: "#what-is-nn", icon: "BrainCircuit" }
+  - { title: "The Neuron (Perceptron)", href: "#neuron", icon: "Disc" } # Using Disc as a simple node
+  - { title: "Layers in a Neural Network", href: "#layers", icon: "Layers" }
+  - { title: "Activation Functions", href: "#activation-functions", icon: "Activity" }
+  - { title: "How Neural Networks Learn", href: "#learning-process", icon: "TrendingUp" }
+  - { title: "Applications", href: "#applications", icon: "AppWindow" }
+prevPost: { title: "Understanding Big O Notation", href: "/blog/big-o-notation-explained" }
+nextPost: { title: "Top 5 VS Code Extensions for Python", href: "/blog/vscode-python-extensions" }
+---
+
+## What is a Neural Network? {#what-is-nn}
+Inspired by the human brain, Artificial Neural Networks (ANNs) are computing systems designed to recognize patterns. They are the foundation of deep learning, a subfield of machine learning, and are used in a wide array of applications, from image recognition to natural language processing.
+
+## The Neuron (Perceptron) {#neuron}
+The most basic unit of a neural network is a neuron, also known as a perceptron (in simpler models). A neuron receives one or more inputs, applies a mathematical operation to them, and produces an output.
+
+Each input is associated with a **weight**, which determines its importance. The neuron sums up all the weighted inputs and adds a **bias**. This sum is then passed through an **activation function** to produce the final output.
+
+<Callout iconName="Info" variant="info" title="Simplified Neuron">
+Output = ActivationFunction( (input1 * weight1) + (input2 * weight2) + ... + bias )
+</Callout>
+
+## Layers in a Neural Network {#layers}
+Neural networks are typically organized into layers:
+
+1.  **Input Layer:** Receives the raw input data (e.g., pixels of an image, words in a sentence).
+2.  **Hidden Layers:** These are intermediate layers between the input and output layers. This is where most of the computation happens. A network can have zero or more hidden layers. Networks with multiple hidden layers are called "deep" neural networks.
+3.  **Output Layer:** Produces the final result (e.g., classification of an image, prediction of a value).
+
+## Activation Functions {#activation-functions}
+Activation functions introduce non-linearity into the network, allowing it to learn complex patterns. Without them, a neural network would just be a linear model. Common activation functions include:
+
+*   **Sigmoid:** Squashes values between 0 and 1.
+*   **Tanh (Hyperbolic Tangent):** Squashes values between -1 and 1.
+*   **ReLU (Rectified Linear Unit):** Outputs the input if it's positive, otherwise outputs 0. Very popular in deep learning.
+*   **Softmax:** Used in the output layer for multi-class classification problems, converting outputs into probabilities.
+
+## How Neural Networks Learn {#learning-process}
+Neural networks "learn" by adjusting their weights and biases through a process called **training**. This typically involves:
+
+1.  **Forward Propagation:** Input data is fed through the network, and an output is produced.
+2.  **Loss Function:** The network's output is compared to the actual target value, and a "loss" (or error) is calculated.
+3.  **Backward Propagation (Backpropagation):** The error is propagated backward through the network, and the weights and biases are adjusted to minimize this error. This is often done using optimization algorithms like Gradient Descent.
+
+This process is repeated many times with a large dataset until the network performs well on unseen data.
+
+## Applications {#applications}
+Neural networks power many AI breakthroughs:
+*   **Image Recognition:** Identifying objects in photos and videos.
+*   **Natural Language Processing (NLP):** Machine translation, sentiment analysis, chatbots.
+*   **Speech Recognition:** Converting spoken language to text.
+*   **Recommendation Systems:** Suggesting products or content.
+
+Byteskill is dedicated to demystifying these complex topics for learners at all levels.
+\`\`\`
