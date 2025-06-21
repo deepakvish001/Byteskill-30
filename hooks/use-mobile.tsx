@@ -1,44 +1,19 @@
-"use client"
+import * as React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+const MOBILE_BREAKPOINT = 768
 
-export function useMobile(query = "(max-width: 768px)"): boolean {
-  const [isMobile, setIsMobile] = useState(false) // Default to false, determine in useEffect
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
 
-  const updateMatch = useCallback(() => {
-    if (typeof window !== "undefined") {
-      const mediaQuery = window.matchMedia(query)
-      setIsMobile(mediaQuery.matches)
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
-  }, [query])
+    mql.addEventListener("change", onChange)
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
 
-  useEffect(() => {
-    // Initial check once mounted on client
-    updateMatch()
-
-    // Set up listener for changes
-    if (typeof window !== "undefined") {
-      const mediaQuery = window.matchMedia(query)
-      const handler = () => updateMatch()
-
-      // Using addEventListener/removeEventListener for modern browsers
-      try {
-        mediaQuery.addEventListener("change", handler)
-      } catch (e) {
-        // Fallback for older browsers that might not support addEventListener on MediaQueryList
-        mediaQuery.addListener(handler)
-      }
-
-      // Cleanup
-      return () => {
-        try {
-          mediaQuery.removeEventListener("change", handler)
-        } catch (e) {
-          mediaQuery.removeListener(handler)
-        }
-      }
-    }
-  }, [query, updateMatch])
-
-  return isMobile
+  return !!isMobile
 }

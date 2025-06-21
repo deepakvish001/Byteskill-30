@@ -1,396 +1,499 @@
 "use client"
 
 import type React from "react"
-import Image from "next/image"
-import { useState, useTransition, useRef, useEffect } from "react"
+
+import { useFormState, useFormStatus } from "react-dom"
+import { useForm, Controller, type SubmitHandler } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import type { User } from "@supabase/supabase-js"
-import type { UserProfile, UpdateUserProfilePayload } from "@/lib/types"
-import { updateUserProfile } from "../profile/actions" // Corrected path
-import { toast } from "@/components/ui/use-toast"
-import { Camera, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch" // For toggles
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Camera, Loader2, Save, Trash2 } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { useToast } from "@/hooks/use-toast"
+import type { UserProfile } from "@/lib/types"
+import { updateUserProfileAction, deleteUserAvatarAction } from "./actions"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge" // For skills/interests
+import { X } from "lucide-react" // For removing tags
 
-import ReactCrop, { type Crop } from "react-image-crop"
-import "react-image-crop/dist/ReactCrop.css"
-import { getCroppedImg, centerAspectCrop } from "@/lib/image-utils"
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
+
+const profileFormSchema = z.object({
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters.")
+    .max(30, "Username must be at most 30 characters.")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores."),
+  full_name: z.string().max(100, "Full name must be at most 100 characters.").optional().or(z.literal("")),
+  email: z.string().email("Invalid email address."), // Readonly, but good to have for display
+  bio: z.string().max(500, "Bio must be at most 500 characters.").optional().or(z.literal("")),
+  website: z.string().url("Invalid URL format.").max(100, "Website URL too long.").optional().or(z.literal("")),
+  location: z.string().max(100, "Location too long.").optional().or(z.literal("")),
+  company: z.string().max(100, "Company name too long.").optional().or(z.literal("")),
+  job_title: z.string().max(100, "Job title too long.").optional().or(z.literal("")),
+  github_username: z
+    .string()
+    .max(50, "GitHub username too long.")
+    .regex(/^[a-zA-Z0-9-]+$/, { message: "Invalid GitHub username format." })
+    .optional()
+    .or(z.literal("")),
+  twitter_username: z
+    .string()
+    .max(50, "Twitter username too long.")
+    .regex(/^[a-zA-Z0-9_]+$/, { message: "Invalid Twitter username format (no @)." })
+    .optional()
+    .or(z.literal("")),
+  linkedin_url: z.string().url("Invalid LinkedIn URL.").max(200, "LinkedIn URL too long.").optional().or(z.literal("")),
+  skills: z.array(z.string().min(1).max(50)).max(20, "Maximum 20 skills allowed.").optional(),
+  interests: z.array(z.string().min(1).max(50)).max(20, "Maximum 20 interests allowed.").optional(),
+  avatarFile: z
+    .any()
+    .refine((file) => !file || file.size <= MAX_FILE_SIZE, `Max image size is 5MB.`)
+    .refine(
+      (file) => !file || ACCEPTED_IMAGE_TYPES.includes(file.type),
+      "Only .jpg, .jpeg, .png, .webp and .gif formats are supported.",
+    )
+    .optional(),
+  notification_preferences: z.object({
+    new_comment_on_my_post: z.boolean().default(true),
+    new_reply_to_my_comment: z.boolean().default(true),
+    newsletter: z.boolean().default(true),
+    // Add other preferences as needed
+  }),
+})
+
+type ProfileFormData = z.infer<typeof profileFormSchema>
 
 interface ProfileFormProps {
-  user: User
-  profile: UserProfile // This is the profile data from the server
+  userProfile: UserProfile
 }
 
-const MAX_BIO_LENGTH = 500
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+        </>
+      ) : (
+        <>
+          <Save className="mr-2 h-4 w-4" /> Save Changes
+        </>
+      )}
+    </Button>
+  )
+}
 
-export default function ProfileForm({ user, profile: profileProp }: ProfileFormProps) {
-  const [isPending, startTransition] = useTransition()
+export function ProfileForm({ userProfile }: ProfileFormProps) {
+  const { toast } = useToast()
+  const [updateState, updateFormAction] = useFormState(updateUserProfileAction, {
+    success: false,
+    message: "",
+    errors: {},
+  })
+  const [deleteAvatarState, deleteAvatarFormAction] = useFormState(deleteUserAvatarAction, {
+    success: false,
+    message: "",
+  })
 
-  // This state represents the last known "saved" state of the profile.
-  // It's updated by the profileProp and after a successful save.
-  const [currentBaseProfile, setCurrentBaseProfile] = useState<UserProfile>(profileProp)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(userProfile.avatar_url || null)
+  const avatarFileRef = useRef<HTMLInputElement>(null)
 
-  // Form field states, initialized from currentBaseProfile
-  const [username, setUsername] = useState(currentBaseProfile.username ?? "")
-  const [fullName, setFullName] = useState(currentBaseProfile.full_name ?? "")
-  const [website, setWebsite] = useState(currentBaseProfile.website ?? "")
-  const [bio, setBio] = useState(currentBaseProfile.bio ?? "")
-  const [mobileNumber, setMobileNumber] = useState(currentBaseProfile.mobile_number ?? "")
-
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(currentBaseProfile.avatar_url ?? null)
-  const [isCropperOpen, setIsCropperOpen] = useState(false)
-  const [imgSrc, setImgSrc] = useState("")
-  const [crop, setCrop] = useState<Crop>()
-  const [completedCrop, setCompletedCrop] = useState<Crop>()
-  const imgRef = useRef<HTMLImageElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isCropping, setIsCropping] = useState(false)
-
-  const [hasChanges, setHasChanges] = useState(false)
-
-  const outlineButtonClasses =
-    "bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-750 hover:text-green-400 hover:border-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-green-500"
-
-  // Effect to synchronize form state when the profileProp changes (e.g., after revalidation)
-  useEffect(() => {
-    setCurrentBaseProfile(profileProp)
-    setUsername(profileProp.username ?? "")
-    setFullName(profileProp.full_name ?? "")
-    setWebsite(profileProp.website ?? "")
-    setBio(profileProp.bio ?? "")
-    setMobileNumber(profileProp.mobile_number ?? "")
-    setAvatarPreview(profileProp.avatar_url ?? null)
-    setAvatarFile(null) // Reset pending file change as we got fresh data
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }, [profileProp])
-
-  // Effect to determine if there are any changes compared to the currentBaseProfile
-  useEffect(() => {
-    const textualChanges =
-      username !== (currentBaseProfile.username ?? "") ||
-      fullName !== (currentBaseProfile.full_name ?? "") ||
-      website !== (currentBaseProfile.website ?? "") ||
-      bio !== (currentBaseProfile.bio ?? "") ||
-      mobileNumber !== (currentBaseProfile.mobile_number ?? "")
-
-    setHasChanges(textualChanges || avatarFile !== null)
-  }, [username, fullName, website, bio, mobileNumber, avatarFile, currentBaseProfile])
-
-  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-      const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Invalid File Type",
-          description: "Please select an image (JPEG, PNG, GIF, WEBP).",
-          variant: "destructive",
-        })
-        return
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        toast({ title: "File Too Large", description: "Maximum file size is 5MB.", variant: "destructive" })
-        return
-      }
-
-      setCrop(undefined)
-      const reader = new FileReader()
-      reader.addEventListener("load", () => setImgSrc(reader.result?.toString() || ""))
-      reader.readAsDataURL(file)
-      setIsCropperOpen(true)
-    }
+  const defaultNotificationPrefs = {
+    new_comment_on_my_post: true,
+    new_reply_to_my_comment: true,
+    newsletter: true,
+    ...(userProfile.notification_preferences as Record<string, boolean> | undefined), // Spread existing prefs
   }
 
-  function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const { width, height } = e.currentTarget
-    setCrop(centerAspectCrop(width, height, 1))
-  }
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    setValue,
+    watch,
+    reset,
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      username: userProfile.username || "",
+      full_name: userProfile.full_name || "",
+      email: userProfile.email || "", // Should be readonly
+      bio: userProfile.bio || "",
+      website: userProfile.website || "",
+      location: userProfile.location || "",
+      company: userProfile.company || "",
+      job_title: userProfile.job_title || "",
+      github_username: userProfile.github_username || "",
+      twitter_username: userProfile.twitter_username || "",
+      linkedin_url: userProfile.linkedin_url || "",
+      skills: userProfile.skills || [],
+      interests: userProfile.interests || [],
+      notification_preferences: defaultNotificationPrefs,
+    },
+  })
 
-  const handleCropImage = async () => {
-    if (!completedCrop || !imgRef.current) {
-      toast({ title: "Cropping error", description: "Could not crop image.", variant: "destructive" })
-      return
-    }
-    const originalFile = fileInputRef.current?.files?.[0]
-    if (!originalFile) return
+  const watchedSkills = watch("skills", userProfile.skills || [])
+  const watchedInterests = watch("interests", userProfile.interests || [])
 
-    setIsCropping(true)
-    try {
-      const croppedFile = await getCroppedImg(imgRef.current, completedCrop, originalFile.name)
-      if (croppedFile) {
-        setAvatarFile(croppedFile)
-        setAvatarPreview(URL.createObjectURL(croppedFile))
+  useEffect(() => {
+    if (updateState?.success) {
+      toast({ title: "Profile Updated", description: updateState.message })
+      if (updateState.updatedProfile?.avatar_url !== undefined) {
+        setAvatarPreview(updateState.updatedProfile.avatar_url)
       }
-    } catch (e) {
-      console.error("Error cropping image:", e)
-      toast({
-        title: "Cropping error",
-        description: "An unexpected error occurred while cropping.",
-        variant: "destructive",
+      // Reset form with new defaults to clear dirty state if needed
+      reset({
+        ...userProfile, // existing profile data
+        ...(updateState.updatedProfile as Partial<ProfileFormData>), // updated fields
+        email: userProfile.email, // ensure email is not overwritten if not part of updatedProfile
+        notification_preferences: {
+          ...defaultNotificationPrefs,
+          ...(updateState.updatedProfile?.notification_preferences as Record<string, boolean> | undefined),
+        },
       })
-    } finally {
-      setIsCropping(false)
-      setIsCropperOpen(false)
+    } else if (updateState?.message && !updateState.success) {
+      toast({ title: "Update Failed", description: updateState.message, variant: "destructive" })
+    }
+  }, [updateState, toast, reset, userProfile])
+
+  useEffect(() => {
+    if (deleteAvatarState?.success) {
+      toast({ title: "Avatar Removed", description: deleteAvatarState.message })
+      setAvatarPreview(null)
+      setValue("avatarFile", null, { shouldDirty: true }) // Clear file input
+    } else if (deleteAvatarState?.message && !deleteAvatarState.success) {
+      toast({ title: "Removal Failed", description: deleteAvatarState.message, variant: "destructive" })
+    }
+  }, [deleteAvatarState, toast, setValue])
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setValue("avatarFile", file, { shouldValidate: true, shouldDirty: true })
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!hasChanges) {
-      toast({ title: "No changes to save." })
-      return
+  const handleTagInput = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    field: "skills" | "interests",
+    currentTags: string[],
+  ) => {
+    if (e.key === "Enter" && e.currentTarget.value.trim() !== "") {
+      e.preventDefault()
+      const newTag = e.currentTarget.value.trim()
+      if (currentTags.length < 20 && !currentTags.includes(newTag) && newTag.length <= 50) {
+        setValue(field, [...currentTags, newTag], { shouldDirty: true })
+      }
+      e.currentTarget.value = "" // Clear input
     }
+  }
 
-    startTransition(async () => {
-      const payload: UpdateUserProfilePayload = {
-        username: username !== (currentBaseProfile.username ?? "") ? username : undefined,
-        full_name: fullName !== (currentBaseProfile.full_name ?? "") ? fullName : undefined,
-        website: website !== (currentBaseProfile.website ?? "") ? website : undefined,
-        bio: bio !== (currentBaseProfile.bio ?? "") ? bio : undefined,
-        mobile_number: mobileNumber !== (currentBaseProfile.mobile_number ?? "") ? mobileNumber : undefined,
-        avatarFile: avatarFile || undefined,
-      }
+  const removeTag = (field: "skills" | "interests", tagToRemove: string, currentTags: string[]) => {
+    setValue(
+      field,
+      currentTags.filter((tag) => tag !== tagToRemove),
+      { shouldDirty: true },
+    )
+  }
 
-      const filteredPayload = Object.fromEntries(
-        Object.entries(payload).filter(([, value]) => value !== undefined),
-      ) as UpdateUserProfilePayload
-
-      if (Object.keys(filteredPayload).length === 0 && !avatarFile) {
-        // Ensure avatarFile alone can trigger save
-        toast({ title: "No changes to save." })
-        return
-      }
-
-      const result = await updateUserProfile(filteredPayload)
-
-      if (result.success && result.data) {
-        toast({ title: "Profile updated successfully!" })
-        // Update the base profile to the newly saved data
-        setCurrentBaseProfile(result.data)
-
-        // Also update individual form states to reflect the saved data
-        // This ensures the form is in sync and hasChanges becomes false
-        setUsername(result.data.username ?? "")
-        setFullName(result.data.full_name ?? "")
-        setWebsite(result.data.website ?? "")
-        setBio(result.data.bio ?? "")
-        setMobileNumber(result.data.mobile_number ?? "")
-        if (result.data.avatar_url) {
-          setAvatarPreview(result.data.avatar_url)
+  const onSubmit: SubmitHandler<ProfileFormData> = (data) => {
+    const formData = new FormData()
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === "avatarFile" && value instanceof File) {
+        formData.append(key, value)
+      } else if (key === "skills" || key === "interests") {
+        if (Array.isArray(value)) {
+          // Send as comma-separated string, or handle as array on server
+          formData.append(key, value.join(","))
         }
-        setAvatarFile(null) // Clear pending file
-        if (fileInputRef.current) fileInputRef.current.value = ""
-
-        setHasChanges(false) // Explicitly set no changes
-      } else {
-        toast({
-          title: "Error updating profile",
-          description: result.error || result.errors?.[0]?.message || "An unknown error occurred.",
-          variant: "destructive",
-        })
+      } else if (key === "notification_preferences" && typeof value === "object" && value !== null) {
+        formData.append(key, JSON.stringify(value)) // Send JSON string
+      } else if (value !== undefined && value !== null) {
+        formData.append(key, String(value))
       }
     })
+    updateFormAction(formData)
   }
 
-  const requiredAsterisk = <span className="text-red-500 ml-1">*</span>
-
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="relative group">
-            <Image
-              src={avatarPreview || "/placeholder.svg?width=128&height=128&query=avatar"}
-              alt="Current avatar"
-              width={128}
-              height={128}
-              className="h-32 w-32 rounded-full object-cover border-2 border-gray-300 dark:border-neutral-700"
-            />
-            <Label
-              htmlFor="avatar"
-              className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Camera className="h-8 w-8 text-white" />
-              <span className="sr-only">Change avatar</span>
-            </Label>
-          </div>
-          <Input
-            id="avatar"
-            name="avatar"
-            type="file"
-            ref={fileInputRef}
-            onChange={onSelectFile}
-            className="hidden"
-            accept="image/png, image/jpeg, image/gif, image/webp"
-          />
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      {updateState?.message && !updateState.success && !updateState.errors && (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{updateState.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Avatar Section */}
+      <div className="flex flex-col items-center sm:flex-row sm:items-end gap-6 p-6 border rounded-lg bg-neutral-800/30">
+        <div className="relative">
+          <Avatar className="h-32 w-32 ring-2 ring-sky-500 ring-offset-2 ring-offset-neutral-900">
+            <AvatarImage src={avatarPreview || undefined} alt={userProfile.username || "User"} />
+            <AvatarFallback className="text-3xl bg-neutral-700">
+              {userProfile.full_name
+                ? userProfile.full_name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                : userProfile.username?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
           <Button
             type="button"
+            size="icon"
             variant="outline"
-            className={cn("text-sm", outlineButtonClasses)}
-            onClick={() => fileInputRef.current?.click()}
+            className="absolute bottom-0 right-0 rounded-full bg-neutral-700 hover:bg-neutral-600 border-neutral-600"
+            onClick={() => avatarFileRef.current?.click()}
+            title="Change avatar"
           >
-            Change Avatar
+            <Camera className="h-5 w-5" />
+            <span className="sr-only">Change avatar</span>
           </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={user.email ?? ""}
-              disabled
-              className="mt-1 bg-gray-100 dark:bg-gray-800 dark:border-gray-700"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Email cannot be changed.</p>
-          </div>
-
-          <div>
-            <Label htmlFor="username">
-              Username
-              {requiredAsterisk}
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="mt-1"
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="full_name">
-              Full Name
-              {requiredAsterisk}
-            </Label>
-            <Input
-              id="full_name"
-              name="full_name"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="mobile_number">
-              Mobile Number
-              {requiredAsterisk}
-            </Label>
-            <Input
-              id="mobile_number"
-              name="mobile_number"
-              type="tel"
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="website">Website</Label>
-          <Input
-            id="website"
-            name="website"
-            type="url"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            className="mt-1"
-            placeholder="https://example.com"
+          <input
+            type="file"
+            id="avatarFile"
+            {...register("avatarFile")}
+            ref={avatarFileRef}
+            className="hidden"
+            accept={ACCEPTED_IMAGE_TYPES.join(",")}
+            onChange={handleAvatarChange}
           />
         </div>
-
-        <div>
-          <Label htmlFor="bio">Bio</Label>
-          <Textarea
-            id="bio"
-            name="bio"
-            rows={4}
-            value={bio}
-            onChange={(e) => {
-              if (e.target.value.length <= MAX_BIO_LENGTH) {
-                setBio(e.target.value)
-              }
-            }}
-            className="mt-1"
-            placeholder="Tell us a little about yourself."
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
-            {bio.length}/{MAX_BIO_LENGTH}
-          </p>
+        <div className="flex-grow text-center sm:text-left">
+          <h2 className="text-xl font-semibold">{userProfile.full_name || userProfile.username}</h2>
+          <p className="text-sm text-neutral-400">@{userProfile.username}</p>
+          {avatarPreview &&
+            userProfile.avatar_url && ( // Only show remove if there's a current server-side avatar
+              <form action={deleteAvatarFormAction} className="mt-2">
+                <Button type="submit" variant="ghost" size="sm" className="text-red-500 hover:text-red-400 px-0">
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Remove Avatar
+                </Button>
+              </form>
+            )}
+          {errors.avatarFile && <p className="text-xs text-red-500 mt-1">{errors.avatarFile.message as string}</p>}
         </div>
+      </div>
 
-        <Button
-          type="submit"
-          className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
-          disabled={isPending || !hasChanges}
+      {/* Personal Information */}
+      <FormSection title="Personal Information">
+        <FormField name="username" label="Username" error={errors.username?.message || updateState?.errors?.username}>
+          <Input {...register("username")} placeholder="your_username" />
+        </FormField>
+        <FormField
+          name="full_name"
+          label="Full Name"
+          error={errors.full_name?.message || updateState?.errors?.full_name}
         >
-          {isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Save Profile"
-          )}
-        </Button>
-      </form>
+          <Input {...register("full_name")} placeholder="Your Full Name" />
+        </FormField>
+        <FormField name="email" label="Email Address" error={errors.email?.message}>
+          <Input type="email" value={userProfile.email || ""} readOnly disabled className="bg-neutral-800/50" />
+          <p className="text-xs text-neutral-500 mt-1">Email cannot be changed here.</p>
+        </FormField>
+        <FormField name="bio" label="Bio" error={errors.bio?.message}>
+          <Textarea {...register("bio")} placeholder="Tell us a little about yourself..." rows={4} />
+        </FormField>
+      </FormSection>
 
-      <Dialog open={isCropperOpen} onOpenChange={setIsCropperOpen}>
-        <DialogContent className="max-w-md bg-neutral-800 border-neutral-700">
-          <DialogHeader>
-            <DialogTitle>Crop your new avatar</DialogTitle>
-          </DialogHeader>
-          {imgSrc && (
-            <ReactCrop
-              crop={crop}
-              onChange={(_, percentCrop) => setCrop(percentCrop)}
-              onComplete={(c) => setCompletedCrop(c)}
-              aspect={1}
-              minWidth={100}
-            >
-              <img
-                ref={imgRef}
-                alt="Crop me"
-                src={imgSrc || "/placeholder.svg"}
-                onLoad={onImageLoad}
-                style={{ maxHeight: "70vh" }}
-              />
-            </ReactCrop>
+      {/* Professional & Social Links */}
+      <FormSection title="Professional & Social">
+        <FormField name="job_title" label="Job Title" error={errors.job_title?.message}>
+          <Input {...register("job_title")} placeholder="e.g., Software Engineer" />
+        </FormField>
+        <FormField name="company" label="Company" error={errors.company?.message}>
+          <Input {...register("company")} placeholder="e.g., Acme Corp" />
+        </FormField>
+        <FormField name="location" label="Location" error={errors.location?.message}>
+          <Input {...register("location")} placeholder="e.g., San Francisco, CA" />
+        </FormField>
+        <FormField name="website" label="Website URL" error={errors.website?.message}>
+          <Input {...register("website")} type="url" placeholder="https://yourwebsite.com" />
+        </FormField>
+        <FormField name="github_username" label="GitHub Username" error={errors.github_username?.message}>
+          <Input {...register("github_username")} placeholder="your_github_username" />
+        </FormField>
+        <FormField name="twitter_username" label="Twitter Username (no @)" error={errors.twitter_username?.message}>
+          <Input {...register("twitter_username")} placeholder="your_twitter_handle" />
+        </FormField>
+        <FormField name="linkedin_url" label="LinkedIn Profile URL" error={errors.linkedin_url?.message}>
+          <Input {...register("linkedin_url")} type="url" placeholder="https://linkedin.com/in/yourprofile" />
+        </FormField>
+      </FormSection>
+
+      {/* Skills & Interests */}
+      <FormSection title="Skills & Interests">
+        <FormField name="skills" label="Skills" error={errors.skills?.message}>
+          <Input
+            id="skills-input"
+            placeholder="Enter a skill and press Enter"
+            onKeyDown={(e) => handleTagInput(e, "skills", watchedSkills)}
+            className="mb-2"
+          />
+          <div className="flex flex-wrap gap-2">
+            {watchedSkills.map((skill) => (
+              <Badge key={skill} variant="secondary" className="flex items-center gap-1">
+                {skill}
+                <button type="button" onClick={() => removeTag("skills", skill, watchedSkills)} title="Remove skill">
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </FormField>
+        <FormField name="interests" label="Interests" error={errors.interests?.message}>
+          <Input
+            id="interests-input"
+            placeholder="Enter an interest and press Enter"
+            onKeyDown={(e) => handleTagInput(e, "interests", watchedInterests)}
+            className="mb-2"
+          />
+          <div className="flex flex-wrap gap-2">
+            {watchedInterests.map((interest) => (
+              <Badge key={interest} variant="secondary" className="flex items-center gap-1">
+                {interest}
+                <button
+                  type="button"
+                  onClick={() => removeTag("interests", interest, watchedInterests)}
+                  title="Remove interest"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </FormField>
+      </FormSection>
+
+      {/* Notification Preferences */}
+      <FormSection title="Notification Preferences">
+        <Controller
+          name="notification_preferences.new_comment_on_my_post"
+          control={control}
+          render={({ field }) => (
+            <ToggleField
+              id="new_comment_on_my_post"
+              label="New comments on my posts"
+              description="Receive an email when someone comments on a blog post you authored."
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCropperOpen(false)} className={outlineButtonClasses}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCropImage}
-              disabled={isCropping || !completedCrop}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {isCropping ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Cropping...
-                </>
-              ) : (
-                "Crop & Save"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        />
+        <Controller
+          name="notification_preferences.new_reply_to_my_comment"
+          control={control}
+          render={({ field }) => (
+            <ToggleField
+              id="new_reply_to_my_comment"
+              label="Replies to my comments"
+              description="Receive an email when someone replies to a comment you made."
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          )}
+        />
+        <Controller
+          name="notification_preferences.newsletter"
+          control={control}
+          render={({ field }) => (
+            <ToggleField
+              id="newsletter"
+              label="Site Newsletter & Announcements"
+              description="Receive occasional updates, news, and announcements from us."
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          )}
+        />
+        {errors.notification_preferences && (
+          <p className="text-xs text-red-500">
+            {errors.notification_preferences.message || "Error with notification settings."}
+          </p>
+        )}
+      </FormSection>
+
+      <div className="flex justify-end pt-6 border-t border-neutral-700">
+        <SubmitButton />
+      </div>
+    </form>
+  )
+}
+
+// Helper components for form structure
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section
+      className="space-y-6 p-6 border rounded-lg bg-neutral-800/30"
+      id={title.toLowerCase().replace(/\s+/g, "-")}
+    >
+      <h3 className="text-xl font-semibold text-neutral-100">{title}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">{children}</div>
+    </section>
+  )
+}
+
+function FormField({
+  name,
+  label,
+  error,
+  children,
+  className,
+}: {
+  name: string
+  label: string
+  error?: string | string[] | undefined
+  children: React.ReactNode
+  className?: string
+}) {
+  const errorText = Array.isArray(error) ? error.join(", ") : error
+  return (
+    <div className={`space-y-2 ${className || ""}`}>
+      <Label htmlFor={name} className={errorText ? "text-red-400" : ""}>
+        {label}
+      </Label>
+      {children}
+      {errorText && <p className="text-xs text-red-400">{errorText}</p>}
+    </div>
+  )
+}
+
+function ToggleField({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string
+  label: string
+  description: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-start space-x-3 rounded-md border p-4 bg-neutral-900/50 md:col-span-2">
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      <div className="space-y-1 leading-none">
+        <Label htmlFor={id} className="font-medium">
+          {label}
+        </Label>
+        <p className="text-xs text-neutral-400">{description}</p>
+      </div>
+    </div>
   )
 }

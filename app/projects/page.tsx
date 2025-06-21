@@ -5,7 +5,9 @@ import { SortOrderSelector } from "@/components/sort-order-selector"
 import { ItemsPerPageSelector } from "@/components/items-per-page-selector"
 import type { ProjectFrontmatter } from "@/lib/types"
 import { PageHeader } from "@/components/page-header"
-import { createClient } from "@/lib/supabase/server" // Import Supabase server client
+import { createClient } from "@/lib/supabase/server"
+import { MostViewedProjects } from "@/components/most-viewed-projects" // Added
+import { Separator } from "@/components/ui/separator" // Added
 
 export const metadata = {
   title: "Projects",
@@ -21,6 +23,10 @@ function sortProjects(projects: ProjectFrontmatter[], sortOrder: string): Projec
       return sorted.sort((a, b) => a.title.localeCompare(b.title))
     case "title-desc":
       return sorted.sort((a, b) => b.title.localeCompare(a.title))
+    case "views-desc": // New
+      return sorted.sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
+    case "views-asc": // New
+      return sorted.sort((a, b) => (a.view_count || 0) - (b.view_count || 0))
     case "date-desc":
     default:
       return sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -32,7 +38,7 @@ export default async function ProjectsPage({
 }: {
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
-  const allProjectsData = getAllProjects()
+  const allProjectsData = await getAllProjects()
 
   if (!Array.isArray(allProjectsData)) {
     console.error("getAllProjects did not return an array:", allProjectsData)
@@ -41,6 +47,7 @@ export default async function ProjectsPage({
         <PageHeader
           title="Projects"
           description="A collection of projects I've worked on, from web apps to open-source tools."
+          className="mb-12 text-center"
         />
         <p className="text-center text-red-500">Error loading projects.</p>
       </div>
@@ -59,7 +66,6 @@ export default async function ProjectsPage({
 
   const totalPages = Math.ceil(sortedProjects.length / Number(perPage))
 
-  // Fetch bookmarked project slugs for the current user
   const supabase = createClient()
   const {
     data: { user },
@@ -85,14 +91,27 @@ export default async function ProjectsPage({
       <PageHeader
         title="Projects"
         description="A collection of projects I've worked on, from web apps to open-source tools."
+        className="mb-12 text-center"
       />
 
+      <MostViewedProjects count={3} className="mb-12" />
+      <Separator className="mb-12 bg-neutral-700" />
+
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-        <p className="text-sm text-neutral-400 dark:text-neutral-500">
+        <p className="text-sm text-neutral-400">
           Showing {paginatedProjects.length} of {sortedProjects.length} projects
         </p>
         <div className="flex items-center gap-4">
-          <SortOrderSelector />
+          <SortOrderSelector
+            options={[
+              { value: "date-desc", label: "Newest" },
+              { value: "date-asc", label: "Oldest" },
+              { value: "title-asc", label: "Title (A-Z)" },
+              { value: "title-desc", label: "Title (Z-A)" },
+              { value: "views-desc", label: "Most Viewed" },
+              { value: "views-asc", label: "Least Viewed" },
+            ]}
+          />
           <ItemsPerPageSelector />
         </div>
       </div>
@@ -103,25 +122,16 @@ export default async function ProjectsPage({
             <ProjectCard
               key={project.slug}
               project={{
-                slug: project.slug,
-                title: project.title,
+                ...project, // Spread existing project data
                 heroImage: project.thumbnailImage || project.heroImage || "/project-thumbnail.png",
-                description: project.description,
-                date: project.date,
-                tags: project.tags,
-                category: project.category, // Ensure category is passed if used by ProjectCard
-                // thumbnailImage and thumbnailBlurDataURL are part of ProjectCardDisplayInfo
-                thumbnailImage: project.thumbnailImage,
-                thumbnailBlurDataURL: project.thumbnailBlurDataURL,
-                heroBlurDataURL: project.heroBlurDataURL, // Pass heroBlurDataURL as well
               }}
-              initialIsBookmarked={bookmarkedProjectSlugs.has(project.slug)} // Pass initial bookmark status
+              initialIsBookmarked={bookmarkedProjectSlugs.has(project.slug)}
             />
           ))}
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-lg text-neutral-500 dark:text-neutral-400">No projects found.</p>
+          <p className="text-lg text-neutral-500 dark:text-neutral-400">No projects found matching your criteria.</p>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import type { UserProfile } from "@/lib/types"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Terminal } from "lucide-react"
+import { ProfileCompletionWidget } from "@/components/profile-completion-widget"
 
 export const metadata = {
   title: "My Profile",
@@ -66,6 +67,8 @@ export default async function ProfilePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <PageHeader title="My Profile" description="View and update your profile information." className="mb-8" />
+
+      {userProfile && !profileError && <ProfileCompletionWidget profile={userProfile} className="mb-8" />}
 
       {isProfileIncomplete && !profileError && (
         <Alert variant="default" className="mb-6 border-yellow-500 bg-yellow-50 text-yellow-700">

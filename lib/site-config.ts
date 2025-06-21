@@ -8,6 +8,7 @@ export const siteConfig = {
   url: "https://www.byteskill.com", // Replace with your actual domain
   domain: "byteskill.com", // Add your base domain here (used for 'from' email)
   ogImage: "/og-image.png", // Path to your Open Graph image
+  logo: "/logo.png", // Path to your site logo, used in structured data
   links: {
     twitter: "https://twitter.com/byteskill", // Replace with your Twitter
     github: "https://github.com/byteskill", // Replace with your GitHub
@@ -29,6 +30,12 @@ export const siteConfig = {
   ],
   email: "your-feedback-email@example.com", // User-facing email for mailto links (if any)
   feedbackRecipientEmail: "your-actual-receiving-email@example.com", // Email address to receive feedback submissions
+  author: {
+    // Crucial for publisher and author structured data
+    name: "The ByteSkill Team", // Or your primary author name
+    url: "https://www.byteskill.com/about", // Link to an about page or author profile
+    twitterHandle: "byteskill", // Optional: Your site's or main author's Twitter handle without @
+  },
 } as const // Using "as const" for better type inference if all values are literals
 
 export type SiteConfig = typeof siteConfig

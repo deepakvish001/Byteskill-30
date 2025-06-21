@@ -1,7 +1,7 @@
 // Server Component – fetches data on the server, so `fs` is safe to use
 import Link from "next/link"
 import Image from "next/image"
-import { getAllPosts, getFeaturedPosts } from "@/lib/posts"
+import { getFeaturedPosts } from "@/lib/posts"
 import type { PostFrontmatter } from "@/lib/posts"
 
 interface FeaturedPostsProps {
@@ -9,8 +9,7 @@ interface FeaturedPostsProps {
 }
 
 export async function FeaturedPostsComponent() {
-  const posts = getFeaturedPosts(await getAllPosts(), 3)
-
+  const posts = await getFeaturedPosts(3)
   return <FeaturedPosts posts={posts} />
 }
 

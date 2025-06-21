@@ -1,12 +1,15 @@
 import Link from "next/link"
 import { Github, Mail, Twitter } from "lucide-react"
-import { getAllPosts, getFeaturedPosts, getAllSeries, getFeaturedSeries } from "@/lib/posts"
-import { getAllProjects, getFeaturedProjects } from "@/lib/projects"
+import { getFeaturedPosts } from "@/lib/posts"
+import { getFeaturedProjects } from "@/lib/projects"
+import { getFeaturedSeriesFromDb } from "@/lib/series"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { HeroSection } from "@/components/hero-section"
 import { FeaturedPosts } from "@/components/featured-posts"
 import { FeaturedProjects } from "@/components/featured-projects"
 import { FeaturedSeries } from "@/components/featured-series"
+import { MostViewedPosts } from "@/components/most-viewed-posts" // New import
+import { MostViewedProjects } from "@/components/most-viewed-projects" // New import
 import { CTASection } from "@/components/cta-section"
 import type { Metadata } from "next"
 import { siteConfig } from "@/lib/site-config"
@@ -26,14 +29,9 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  const allPostsData = await getAllPosts()
-  const featuredPosts = getFeaturedPosts(allPostsData, 3)
-
-  const allProjectsData = await getAllProjects()
-  const featuredProjects = getFeaturedProjects(allProjectsData, 3)
-
-  const allSeriesData = getAllSeries()
-  const featuredSeries = getFeaturedSeries(allSeriesData, 3)
+  const featuredPosts = await getFeaturedPosts(3)
+  const featuredProjects = await getFeaturedProjects(3)
+  const featuredSeries = await getFeaturedSeriesFromDb(3)
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -41,12 +39,12 @@ export default async function HomePage() {
         <HeroSection />
 
         <main id="main-content" tabIndex={-1} className="flex-grow outline-none">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-12 md:space-y-16 py-12 md:py-16">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-16 md:space-y-20 py-12 md:py-16">
             <FeaturedPosts posts={featuredPosts} />
+            <MostViewedPosts count={3} className="mt-12 md:mt-16" /> {/* Added */}
             <FeaturedProjects projects={featuredProjects} />
+            <MostViewedProjects count={3} className="mt-12 md:mt-16" /> {/* Added */}
             <FeaturedSeries series={featuredSeries} />
-
-            {/* Connect Section - container removed, my-12 removed */}
             <section className="bg-neutral-800/30 p-6 sm:p-8 rounded-lg border border-neutral-700/50">
               <h2 className="text-xl font-semibold text-neutral-100 mb-4">Connect with Byteskill</h2>
               <p className="mb-6 text-neutral-400">
@@ -107,7 +105,6 @@ export default async function HomePage() {
                 </Tooltip>
               </div>
             </section>
-
             <CTASection />
           </div>
         </main>

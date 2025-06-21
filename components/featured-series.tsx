@@ -1,10 +1,10 @@
 import Link from "next/link"
 import Image from "next/image"
-import type { Series } from "@/lib/posts" // Assuming Series type is defined here
-import { Badge } from "@/components/ui/badge"
+import type { SeriesListingInfo } from "@/lib/types" // Ensure this type matches what getFeaturedSeriesFromDb returns
+import { BookOpenText } from "lucide-react"
 
 interface FeaturedSeriesProps {
-  series: Series[]
+  series: SeriesListingInfo[]
 }
 
 export function FeaturedSeries({ series }: FeaturedSeriesProps) {
@@ -30,30 +30,34 @@ export function FeaturedSeries({ series }: FeaturedSeriesProps) {
         </Link>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {series.map((s) => (
+        {series.map((item) => (
           <Link
-            key={s.slug}
-            href={`/series/${s.slug}`}
-            aria-label={`View series: ${s.title}`}
+            key={item.slug}
+            href={`/series/${item.slug}`}
+            aria-label={`Explore series: ${item.title}`}
             className="block border border-neutral-700 rounded-lg hover:border-green-500 transition-colors group overflow-hidden bg-neutral-800/30 hover:bg-neutral-800/60"
           >
-            {s.heroImage && (
+            {item.heroImage ? (
               <div className="aspect-video bg-neutral-800 overflow-hidden">
                 <Image
-                  src={s.heroImage || "/placeholder.svg"}
-                  alt={`${s.title} thumbnail`}
+                  src={item.heroImage || "/placeholder.svg"}
+                  alt={`${item.title} series hero image`}
                   width={400}
                   height={225}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
+            ) : (
+              <div className="aspect-video bg-neutral-700 flex items-center justify-center">
+                <BookOpenText className="w-12 h-12 text-neutral-500" />
+              </div>
             )}
             <div className="p-4">
-              <h3 className="font-medium text-neutral-100 group-hover:text-green-400 mb-1">{s.title}</h3>
-              <p className="text-sm text-neutral-400 line-clamp-2 mb-2">{s.description}</p>
-              <Badge variant="secondary" className="text-xs bg-neutral-700 text-neutral-300">
-                {s.posts.length} Part{s.posts.length === 1 ? "" : "s"}
-              </Badge>
+              <h3 className="font-medium text-neutral-100 group-hover:text-green-400 mb-1">{item.title}</h3>
+              <p className="text-sm text-neutral-400 line-clamp-2 mb-2">{item.description}</p>
+              <p className="text-xs text-neutral-500">
+                {item.postCount} Article{item.postCount !== 1 ? "s" : ""}
+              </p>
             </div>
           </Link>
         ))}

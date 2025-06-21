@@ -1,259 +1,231 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import rehypeSlug from "rehype-slug"
+import { Eye } from "lucide-react"
 import { TableOfContents } from "@/components/table-of-contents"
-// Ensure TocEntry type matches what sanitizeFrontmatterForClient produces for `toc`
-import type { PostFrontmatter, TocEntry as ClientTocEntryConfig } from "@/lib/types"
-import { SeriesNavigationBox } from "@/components/series-navigation-box"
-import { mdxComponents } from "@/components/mdx-components"
-import { Badge } from "@/components/ui/badge"
-import { CalendarDays, Clock, Tag, ChevronsLeft, ChevronsRight, BookOpenText } from "lucide-react"
-import { Breadcrumbs, type BreadcrumbItem } from "@/components/breadcrumbs"
-import { ArticleCard } from "@/components/article-card"
-import { useUser } from "@/app/contexts/UserContext"
-import { markPostAsReadInSeries } from "@/app/series/actions"
-import { useToast } from "@/hooks/use-toast"
+import { Breadcrumbs } from "@/components/breadcrumbs"
+import { SocialShareButtons } from "@/components/social-share-buttons"
 import { BookmarkButton } from "@/components/bookmark-button"
-
-const GENERIC_BLUR_DATA_URL =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8/x8AAuMB8DtXNJsAAAAASUVORK5CYII="
-
-const FALLBACK_HEADER_HEIGHT = 90
+import { SeriesNavigationBox } from "@/components/series-navigation-box"
+import { ArticleCard } from "@/components/article-card"
+import { siteConfig } from "@/lib/site-config"
+import type { PostFrontmatter } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
+import { CommentsSection } from "@/components/comments/comments-section"
+import type { User } from "@supabase/supabase-js"
+import { incrementViewCount } from "@/app/content/actions" // New action
+import { useToast } from "@/hooks/use-toast"
 
 interface BlogPostPageClientProps {
-  content: string
-  frontmatter: PostFrontmatter // This now receives ClientReadyPostFrontmatter structure
+  frontmatter: PostFrontmatter & { contentHtml: string }
   relatedPosts: PostFrontmatter[]
-  postsInSeries: PostFrontmatter[]
 }
 
-export function BlogPostPageClient({ content, frontmatter, relatedPosts, postsInSeries }: BlogPostPageClientProps) {
-  const [headerHeight, setHeaderHeight] = useState(FALLBACK_HEADER_HEIGHT)
-  const { user, isLoading: isUserLoading } = useUser()
+export function BlogPostPageClient({ frontmatter, relatedPosts }: BlogPostPageClientProps) {
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [currentViewCount, setCurrentViewCount] = useState<number>(frontmatter.view_count || 0)
+  const viewIncrementedRef = useRef(false) // To ensure view count is incremented only once per page load/client session
   const { toast } = useToast()
-  const hasMarkedAsReadRef = useRef(false)
-  const endOfContentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const siteHeaderElement = document.getElementById("site-header")
-    if (siteHeaderElement) {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          setHeaderHeight(entry.target.clientHeight)
-        }
-      })
-      observer.observe(siteHeaderElement)
-      setHeaderHeight(siteHeaderElement.clientHeight)
-      return () => observer.disconnect()
+    const supabase = createClient()
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setCurrentUser(user)
+    }
+    fetchUser()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setCurrentUser(session?.user ?? null)
+    })
+
+    return () => {
+      authListener?.subscription.unsubscribe()
     }
   }, [])
 
-  const scrollOffset = headerHeight > 0 ? headerHeight + 24 : FALLBACK_HEADER_HEIGHT + 24
-
-  // frontmatter.toc should now be ClientReadyTocEntry[] | null
-  const tocEntries: ClientTocEntryConfig[] =
-    frontmatter.toc && Array.isArray(frontmatter.toc)
-      ? frontmatter.toc.filter((item: any): item is ClientTocEntryConfig => {
-          // Perform a stricter check on the item structure
-          const isValid =
-            typeof item.slug === "string" && typeof item.title === "string" && typeof item.level === "number"
-          if (!isValid) {
-            console.warn("[TOC Client] Skipping malformed TOC entry (received from server):", JSON.stringify(item))
-          }
-          return isValid
-        })
-      : []
-
   useEffect(() => {
-    if (isUserLoading || !user || !frontmatter.series || !endOfContentRef.current) {
-      return
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (entry.isIntersecting && !hasMarkedAsReadRef.current) {
-          hasMarkedAsReadRef.current = true
-          observer.disconnect()
-
-          markPostAsReadInSeries(frontmatter.series!.slug, frontmatter.slug)
-            .then((result) => {
-              if (result.success) {
-                toast({
-                  title: "Progress Saved",
-                  description: `"${frontmatter.title}" marked as read in the series.`,
-                })
-              } else {
-                console.error("Failed to mark post as read:", result.error)
-              }
-            })
-            .catch((error) => {
-              console.error("Error calling markPostAsReadInSeries:", error)
-            })
+    if (frontmatter.id && !viewIncrementedRef.current) {
+      const doIncrement = async () => {
+        try {
+          // console.log(`Attempting to increment view count for post ID: ${frontmatter.id}`);
+          const result = await incrementViewCount(frontmatter.id, "post")
+          if (result.success && result.newViewCount !== undefined) {
+            // console.log(`View count incremented successfully. New count: ${result.newViewCount}`);
+            setCurrentViewCount(result.newViewCount)
+          } else if (!result.success && result.error) {
+            // console.warn(`Failed to increment view count: ${result.error}`);
+            // Don't show toast for rate limit or already viewed, it's expected.
+            // if (result.error !== "Rate limit exceeded. Try again later.") {
+            //   toast({ title: "View Count", description: result.error, variant: "destructive" });
+            // }
+          }
+        } catch (error) {
+          console.error("Error in incrementViewCount effect:", error)
+          // toast({ title: "Error", description: "Could not update view count.", variant: "destructive" });
+        } finally {
+          viewIncrementedRef.current = true
         }
-      },
-      { rootMargin: "0px", threshold: 0.1 },
-    )
-    observer.observe(endOfContentRef.current)
-    return () => {
-      observer.disconnect()
+      }
+      doIncrement()
     }
-  }, [user, isUserLoading, frontmatter.series, frontmatter.slug, frontmatter.title, toast])
+  }, [frontmatter.id, toast])
 
-  const formattedDate = frontmatter.date
-    ? new Date(frontmatter.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-    : "N/A"
+  const {
+    id: postId,
+    title,
+    date,
+    updated_at,
+    author,
+    heroImage,
+    tags,
+    originalTags,
+    series,
+    prevPost,
+    nextPost,
+    contentHtml,
+    isBookmarked: initialIsBookmarked,
+  } = frontmatter
 
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { label: "Home", href: "/" },
-    { label: "Blog", href: "/blog" },
-  ]
-  if (frontmatter.series) {
-    breadcrumbItems.push({ label: "Series", href: "/series" })
-    breadcrumbItems.push({ label: frontmatter.series.title, href: `/series/${frontmatter.series.slug}` })
-  }
-  breadcrumbItems.push({ label: frontmatter.title, href: `/blog/${frontmatter.slug}`, isCurrentPage: true })
+  const publishedDate = new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+  const updatedDate = updated_at
+    ? new Date(updated_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null
+
+  const pageUrl = `${siteConfig.url}/blog/${frontmatter.slug}`
 
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      className="container mx-auto px-4 sm:px-6 lg:px-8 flex-grow py-8 md:py-12 outline-none"
-    >
-      <Breadcrumbs items={breadcrumbItems} className="mb-6 md:mb-8" />
-      <article className="grid grid-cols-1 lg:grid-cols-4 gap-x-12">
-        <div className="lg:col-span-3">
-          {(frontmatter.heroImage || frontmatter.thumbnailImage) && (
-            <div className="relative w-full aspect-[2.35/1] rounded-lg overflow-hidden mb-8 shadow-lg bg-neutral-800">
-              <Image
-                src={
-                  frontmatter.heroImage ||
-                  frontmatter.thumbnailImage ||
-                  `/placeholder.svg?width=1200&height=510&query=${encodeURIComponent(frontmatter.title) || "blog post hero"}`
-                }
-                alt={`${frontmatter.title} hero image`}
-                fill
-                priority
-                className="object-cover"
-                sizes="(min-width: 1024px) 75vw, 90vw"
-                placeholder="blur"
-                blurDataURL={frontmatter.heroBlurDataURL || frontmatter.thumbnailBlurDataURL || GENERIC_BLUR_DATA_URL}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+    <div className="container mx-auto px-4 py-8">
+      <Breadcrumbs
+        segments={[
+          { title: "Home", href: "/" },
+          { title: "Blog", href: "/blog" },
+          { title: frontmatter.title, href: `/blog/${frontmatter.slug}` },
+        ]}
+        className="mb-6"
+      />
+
+      <article className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8 xl:col-span-9 space-y-8">
+          <header className="space-y-4">
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{title}</h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <span>
+                Published on <time dateTime={date}>{publishedDate}</time>
+              </span>
+              {updatedDate && updatedDate !== publishedDate && (
+                <span>
+                  Updated on <time dateTime={updated_at!}>{updatedDate}</time>
+                </span>
+              )}
+              {author && (
+                <span>
+                  By{" "}
+                  <Link href={author.url || "#"} className="hover:text-primary hover:underline">
+                    {author.name}
+                  </Link>
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Eye className="h-4 w-4" />
+                {currentViewCount.toLocaleString()} views
+              </span>
             </div>
-          )}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-neutral-100 mb-3 tracking-tight">
-            {frontmatter.title}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-neutral-400 mb-6">
-            <div className="flex items-center">
-              <CalendarDays className="w-4 h-4 mr-1.5 text-green-400" />
-              <span>{formattedDate}</span>
-            </div>
-            {frontmatter.readTime && (
-              <div className="flex items-center">
-                <Clock className="w-4 h-4 mr-1.5 text-green-400" />
-                <span>{frontmatter.readTime}</span>
+            {heroImage && (
+              <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border">
+                <Image src={heroImage || "/placeholder.svg"} alt={title} layout="fill" objectFit="cover" priority />
               </div>
             )}
-            <BookmarkButton
-              itemId={frontmatter.slug}
-              itemType="post"
-              initialIsBookmarked={frontmatter.isBookmarked || false}
-            />
-          </div>
-          {frontmatter.originalTags && frontmatter.originalTags.length > 0 && (
-            <div className="flex items-center gap-x-2 mb-6">
-              <Tag className="w-4 h-4 text-green-400" />
+          </header>
+
+          {series && <SeriesNavigationBox series={series} currentPostSlug={frontmatter.slug} />}
+
+          <div
+            className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none 
+                       prose-headings:font-semibold prose-a:text-primary hover:prose-a:underline 
+                       prose-img:rounded-md prose-img:border prose-img:border-border"
+            dangerouslySetInnerHTML={{ __html: contentHtml }}
+          />
+
+          <footer className="space-y-6 pt-6 border-t border-border">
+            {tags && tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {frontmatter.originalTags.map((displayTag, index) => {
-                  const normalizedTag = frontmatter.tags?.[index]
-                  if (!normalizedTag) return null
-                  return (
-                    <Link href={`/tags/${normalizedTag}`} key={normalizedTag}>
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-700/20 text-green-300 border-green-600/50 hover:bg-green-600/20 text-xs px-1.5 py-0.5 cursor-pointer"
-                      >
-                        {displayTag}
-                      </Badge>
-                    </Link>
-                  )
-                })}
+                <span className="font-medium">Tags:</span>
+                {originalTags?.map((tag, index) => (
+                  <Link
+                    key={tag}
+                    href={`/tags/${tags[index]}`}
+                    className="px-2 py-0.5 text-xs bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground rounded-full transition-colors"
+                  >
+                    {tag}
+                  </Link>
+                ))}
               </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <SocialShareButtons url={pageUrl} title={title} />
+              <BookmarkButton
+                itemId={frontmatter.slug} // slug is used as itemId for posts in bookmarking
+                itemType="post"
+                initialBookmarked={initialIsBookmarked || false}
+                userId={currentUser?.id}
+                className="w-full sm:w-auto"
+              />
             </div>
-          )}
-          {frontmatter.series && postsInSeries.length > 0 && (
-            <SeriesNavigationBox
-              currentPostSlug={frontmatter.slug}
-              seriesTitle={frontmatter.series.title}
-              seriesSlug={frontmatter.series.slug}
-              postsInSeries={postsInSeries}
-            />
-          )}
-          <div className="prose prose-invert prose-neutral max-w-none prose-headings:text-neutral-100 prose-headings:font-semibold prose-a:text-green-400 hover:prose-a:text-green-300 prose-strong:text-neutral-200 prose-code:bg-neutral-800 prose-code:text-green-300 prose-code:p-1 prose-code:rounded-md prose-code:font-mono prose-code:text-sm prose-pre:bg-neutral-800 prose-pre:border prose-pre:border-neutral-700 prose-pre:rounded-lg prose-blockquote:border-l-green-500 prose-blockquote:text-neutral-400 prose-li:marker:text-green-400">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]} components={mdxComponents as any}>
-              {content}
-            </ReactMarkdown>
-          </div>
-          <div ref={endOfContentRef} className="h-4" />
-          {(frontmatter.prevPost || frontmatter.nextPost) && (
-            <nav className="mt-12 pt-8 border-t border-neutral-800 flex flex-col sm:flex-row justify-between gap-6">
-              {frontmatter.prevPost ? (
-                <Link
-                  href={frontmatter.prevPost.href}
-                  className="group flex-1 p-4 border border-neutral-700 rounded-lg hover:border-green-500 transition-colors text-left bg-neutral-800/30 hover:bg-neutral-800/60"
-                >
-                  <div className="text-xs text-neutral-400 mb-1 group-hover:text-green-400 flex items-center">
-                    <ChevronsLeft className="w-4 h-4 mr-1.5" /> Previous Post
-                  </div>
-                  <span className="font-medium text-neutral-200 group-hover:text-green-300">
-                    {frontmatter.prevPost.title}
-                  </span>
-                </Link>
-              ) : (
-                <div className="flex-1"></div>
-              )}
-              {frontmatter.nextPost ? (
-                <Link
-                  href={frontmatter.nextPost.href}
-                  className="group flex-1 p-4 border border-neutral-700 rounded-lg hover:border-green-500 transition-colors text-right bg-neutral-800/30 hover:bg-neutral-800/60"
-                >
-                  <div className="text-xs text-neutral-400 mb-1 group-hover:text-green-400 flex items-center justify-end">
-                    Next Post <ChevronsRight className="w-4 h-4 ml-1.5" />
-                  </div>
-                  <span className="font-medium text-neutral-200 group-hover:text-green-300">
-                    {frontmatter.nextPost.title}
-                  </span>
-                </Link>
-              ) : (
-                <div className="flex-1"></div>
-              )}
-            </nav>
-          )}
-          {relatedPosts && relatedPosts.length > 0 && (
-            <section className="mt-16 pt-12 border-t border-neutral-800">
-              <h2 className="text-2xl sm:text-3xl font-bold text-neutral-100 mb-8 flex items-center">
-                <BookOpenText className="w-7 h-7 mr-3 text-green-400" /> Related Articles
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {(prevPost || nextPost) && (
+              <nav className="flex flex-col sm:flex-row justify-between gap-4 pt-4 border-t border-border">
+                {prevPost ? (
+                  <Link href={`/blog/${prevPost.slug}`} className="text-sm text-muted-foreground hover:text-primary">
+                    &larr; Previous: {prevPost.title}
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                {nextPost ? (
+                  <Link
+                    href={`/blog/${nextPost.slug}`}
+                    className="text-sm text-muted-foreground hover:text-primary text-right"
+                  >
+                    Next: {nextPost.title} &rarr;
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            )}
+          </footer>
+
+          {postId && <CommentsSection postId={postId} currentUser={currentUser} />}
+        </div>
+
+        <aside className="lg:col-span-4 xl:col-span-3 lg:sticky lg:top-20 self-start space-y-8">
+          <TableOfContents content={frontmatter.content || ""} />
+          {relatedPosts.length > 0 && (
+            <section>
+              <h3 className="text-xl font-semibold mb-4 text-foreground">Related Articles</h3>
+              <div className="space-y-4">
                 {relatedPosts.map((post) => (
-                  <ArticleCard key={post.slug} post={post} initialIsBookmarked={post.isBookmarked || false} />
+                  <ArticleCard key={post.slug} post={post} compact />
                 ))}
               </div>
             </section>
           )}
-        </div>
-        <aside className="lg:col-span-1 mt-12 lg:mt-0">
-          <div className="sticky min-h-[10rem]" style={{ top: `${scrollOffset}px` }}>
-            <TableOfContents toc={tocEntries} scrollOffset={scrollOffset} title="In this article" />
-          </div>
         </aside>
       </article>
-    </main>
+    </div>
   )
 }

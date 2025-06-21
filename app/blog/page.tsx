@@ -4,18 +4,18 @@ import { PaginationControls } from "@/components/pagination-controls"
 import { SortOrderSelector } from "@/components/sort-order-selector"
 import { ItemsPerPageSelector } from "@/components/items-per-page-selector"
 import type { PostFrontmatter } from "@/lib/types"
-import { createClient } from "@/lib/supabase/server" // For server-side Supabase
+import { createClient } from "@/lib/supabase/server"
+import { PageHeader } from "@/components/page-header" // Added for consistency
+import { MostViewedPosts } from "@/components/most-viewed-posts" // Added
+import { Separator } from "@/components/ui/separator" // Added
 
 export const metadata = {
   title: "Blog",
   description: "Explore articles on web development, software engineering, and technology.",
 }
 
-// Helper function for sorting posts
 function sortPosts(posts: PostFrontmatter[], sortOrder: string): PostFrontmatter[] {
-  // Create a shallow copy to avoid mutating the original array
   const sorted = [...posts]
-
   switch (sortOrder) {
     case "date-asc":
       return sorted.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -23,19 +23,22 @@ function sortPosts(posts: PostFrontmatter[], sortOrder: string): PostFrontmatter
       return sorted.sort((a, b) => a.title.localeCompare(b.title))
     case "title-desc":
       return sorted.sort((a, b) => b.title.localeCompare(a.title))
+    case "views-desc": // New
+      return sorted.sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
+    case "views-asc": // New
+      return sorted.sort((a, b) => (a.view_count || 0) - (b.view_count || 0))
     case "date-desc":
     default:
       return sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
 }
 
-// Make the page component async
 export default async function BlogPage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
-  const allPosts = getAllPosts()
+  const allPosts = await getAllPosts()
 
   const page = searchParams["page"] ?? "1"
   const perPage = searchParams["per_page"] ?? "9"
@@ -49,7 +52,6 @@ export default async function BlogPage({
 
   const totalPages = Math.ceil(sortedPosts.length / Number(perPage))
 
-  // --- Fetch bookmark statuses server-side ---
   const supabase = createClient()
   const {
     data: { user },
@@ -57,51 +59,60 @@ export default async function BlogPage({
   let bookmarkedPostSlugs = new Set<string>()
 
   if (user) {
-    // Fetch IDs of all posts bookmarked by the current user
     const { data: bookmarks, error: bookmarksError } = await supabase
       .from("bookmarks")
       .select("item_id")
       .eq("user_id", user.id)
-      .eq("item_type", "post") // Only fetch for posts
+      .eq("item_type", "post")
 
     if (bookmarksError) {
       console.error("Error fetching post bookmarks on blog page:", bookmarksError.message)
-      // Continue without bookmark info if there's an error
     } else if (bookmarks) {
       bookmarkedPostSlugs = new Set(bookmarks.map((b) => b.item_id))
     }
   }
-  // --- End fetch bookmark statuses ---
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <header className="mb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-neutral-100 tracking-tight">Blog</h1>
-        <p className="mt-4 text-lg text-neutral-400 max-w-2xl mx-auto">
-          Explore articles on web development, software engineering, and technology.
-        </p>
-      </header>
+      <PageHeader
+        title="Blog"
+        description="Explore articles on web development, software engineering, and technology."
+        className="mb-12 text-center"
+      />
+
+      <MostViewedPosts count={3} className="mb-12" />
+      <Separator className="mb-12 bg-neutral-700" />
 
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <p className="text-sm text-neutral-400">
           Showing {paginatedPosts.length} of {allPosts.length} articles
         </p>
         <div className="flex items-center gap-4">
-          <SortOrderSelector />
+          <SortOrderSelector
+            options={[
+              { value: "date-desc", label: "Newest" },
+              { value: "date-asc", label: "Oldest" },
+              { value: "title-asc", label: "Title (A-Z)" },
+              { value: "title-desc", label: "Title (Z-A)" },
+              { value: "views-desc", label: "Most Viewed" },
+              { value: "views-asc", label: "Least Viewed" },
+            ]}
+          />
           <ItemsPerPageSelector />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {paginatedPosts.map((post) => (
-          <ArticleCard
-            key={post.slug}
-            post={post}
-            // Pass the initial bookmark status
-            initialIsBookmarked={bookmarkedPostSlugs.has(post.slug)}
-          />
-        ))}
-      </div>
+      {paginatedPosts.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {paginatedPosts.map((post) => (
+            <ArticleCard key={post.slug} post={post} initialIsBookmarked={bookmarkedPostSlugs.has(post.slug)} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <p className="text-lg text-neutral-500 dark:text-neutral-400">No articles found matching your criteria.</p>
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="mt-12">

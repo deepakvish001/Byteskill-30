@@ -24,8 +24,12 @@ export const metadata: Metadata = {
 }
 
 export default function SiteDirectoryPage() {
-  const allPosts = getAllPosts()
-  const allProjects = getAllProjects()
+  // Ensure we always hand an array to SiteDirectoryToc
+  const postsData = getAllPosts()
+  const allPosts = Array.isArray(postsData) ? postsData : Array.from(Object.values(postsData as any))
+
+  const projectsData = getAllProjects()
+  const allProjects = Array.isArray(projectsData) ? projectsData : Array.from(Object.values(projectsData as any))
 
   return (
     <div className="bg-neutral-900 text-neutral-300 min-h-screen flex flex-col">

@@ -1,114 +1,78 @@
 import Link from "next/link"
 import Image from "next/image"
-import { getAllSeries, type SeriesListingInfo } from "@/lib/posts"
-import { ArrowLeft, ListOrdered, ChevronRight } from "lucide-react"
-import type { Metadata } from "next"
-import { siteConfig } from "@/lib/site-config"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { SeriesProgressDisplay } from "@/components/series-progress-display"
+import { PageHeader } from "@/components/page-header"
+import { getAllSeriesWithPostCount } from "@/lib/series" // Updated import
+import type { SeriesListingInfo } from "@/lib/types"
+import { BookOpenText } from "lucide-react"
 
-const GENERIC_BLUR_DATA_URL =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8/x8AAuMB8DtXNJsAAAAASUVORK5CYII="
-
-export const metadata: Metadata = {
+export const metadata = {
   title: "Blog Series",
-  description: `Browse collections of related articles on ${siteConfig.name}. Dive deep into topics with our curated series.`,
-  openGraph: {
-    title: `Blog Series | ${siteConfig.name}`,
-    description: `Browse collections of related articles on ${siteConfig.name}.`,
-    url: `${siteConfig.url}/series`,
-  },
-  twitter: {
-    title: `Blog Series | ${siteConfig.name}`,
-    description: `Browse collections of related articles on ${siteConfig.name}.`,
-  },
+  description: "Explore organized collections of articles on specific topics and learning paths.",
 }
 
-export default function AllSeriesPage() {
-  const allSeries = getAllSeries()
+export default async function SeriesListPage() {
+  const seriesList = await getAllSeriesWithPostCount() // Fetches published series with details
 
   return (
-    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <Link href="/blog" className="inline-flex items-center text-sm text-green-400 hover:underline">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to all articles
-        </Link>
-      </div>
-      <header className="mb-12 text-center">
-        <ListOrdered className="w-12 h-12 text-green-400 mx-auto mb-4" />
-        <h1 className="text-4xl font-bold text-neutral-100 mb-3">Explore Our Blog Series</h1>
-        <p className="text-neutral-400 max-w-xl mx-auto">
-          Dive deeper into specific topics with our curated collections of articles.
-        </p>
-      </header>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <PageHeader
+        title="Blog Series"
+        description="Explore organized collections of articles on specific topics and learning paths."
+      />
 
-      {allSeries.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {allSeries.map((series: SeriesListingInfo) => (
-            <Card
+      {seriesList.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {seriesList.map((series: SeriesListingInfo) => (
+            <Link
               key={series.slug}
-              className="h-full flex flex-col bg-neutral-800/50 border-neutral-700/80 hover:border-green-500/70 transition-all duration-300 ease-in-out group hover:shadow-xl hover:shadow-green-900/20 overflow-hidden"
+              href={`/series/${series.slug}`}
+              className="block border border-neutral-700 rounded-lg hover:border-green-500 transition-colors group overflow-hidden bg-neutral-800/30 hover:bg-neutral-800/60"
             >
-              <div className="aspect-video relative w-full overflow-hidden bg-neutral-750">
-                <Image
-                  src={
-                    series.heroImage ||
-                    `/placeholder.svg?width=400&height=225&query=Series+${encodeURIComponent(series.title) || "series-placeholder"}`
-                  }
-                  alt={`${series.title} series hero image`}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
-                  placeholder="blur"
-                  blurDataURL={series.heroBlurDataURL || GENERIC_BLUR_DATA_URL}
-                  unoptimized={!series.heroImage}
-                />
-              </div>
-              <CardHeader className="pb-3 pt-4">
-                <CardTitle className="text-lg font-semibold text-neutral-100 group-hover:text-green-300 transition-colors">
+              {series.heroImage ? (
+                <div className="aspect-video bg-neutral-800 overflow-hidden">
+                  <Image
+                    src={series.heroImage || "/placeholder.svg"}
+                    alt={`${series.title} series hero image`}
+                    width={400}
+                    height={225}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ) : (
+                <div className="aspect-video bg-neutral-700 flex items-center justify-center">
+                  <BookOpenText className="w-16 h-16 text-neutral-500" />
+                </div>
+              )}
+              <div className="p-4">
+                <h2 className="text-xl font-semibold text-neutral-100 group-hover:text-green-400 mb-2">
                   {series.title}
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500 group-hover:text-neutral-400 transition-colors">
-                  {series.postCount} part{series.postCount !== 1 ? "s" : ""} • Last updated:{" "}
-                  {new Date(series.lastUpdated + "T00:00:00").toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    timeZone: "UTC",
-                  })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow flex flex-col justify-between pt-0">
-                <p className="text-sm text-neutral-400 line-clamp-3 mb-4 group-hover:text-neutral-300 transition-colors">
-                  {series.description ||
-                    `Explore the "${series.title}" series, covering various aspects of the topic in detail across multiple posts.`}
-                </p>
-
-                <SeriesProgressDisplay
-                  seriesSlug={series.slug}
-                  totalPosts={series.postCount}
-                  showCurrentlyReading={true}
-                />
-
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-auto bg-neutral-700/50 border-neutral-600 text-neutral-300 group-hover:bg-green-500/20 group-hover:border-green-500/50 group-hover:text-green-300 transition-all"
-                >
-                  <Link href={`/series/${series.slug}`}>
-                    View Series <ChevronRight className="w-4 h-4 ml-1.5" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+                </h2>
+                <p className="text-sm text-neutral-400 line-clamp-3 mb-3">{series.description}</p>
+                <div className="flex justify-between items-center text-xs text-neutral-500">
+                  <span>
+                    {series.postCount} Article{series.postCount !== 1 ? "s" : ""}
+                  </span>
+                  <span>
+                    Last updated:{" "}
+                    {new Date(series.lastUpdated).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       ) : (
-        <p className="text-neutral-400 text-center py-10">No series found at the moment. Check back soon!</p>
+        <div className="text-center py-12">
+          <p className="text-lg text-neutral-500 dark:text-neutral-400">No series available at the moment.</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-2">
+            Check back soon for curated learning paths!
+          </p>
+        </div>
       )}
-    </main>
+    </div>
   )
 }

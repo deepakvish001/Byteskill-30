@@ -1,133 +1,167 @@
-import fs from "fs"
-import path from "path"
-import matter from "gray-matter"
-import type { ProjectFrontmatter } from "./types"
+import { createClient } from "@/lib/supabase/server"
+import type { ProjectFrontmatter, DbProject as DbProjectType } from "./types"
+import { cache } from "react"
+import { siteConfig } from "./site-config"
 
-const projectsDirectory = path.join(process.cwd(), "content/projects")
+function dbProjectToProjectFrontmatter(project: DbProjectType): ProjectFrontmatter {
+  const authorName = project.author?.full_name || project.author?.username || siteConfig.author.name
+  const authorUrl = project.author?.username ? `${siteConfig.url}/u/${project.author.username}` : siteConfig.author.url
 
-export function getProjectSlugs(): string[] {
-  try {
-    if (!fs.existsSync(projectsDirectory)) {
-      console.warn(`[lib/projects] projectsDirectory does not exist: ${projectsDirectory}`)
+  return {
+    id: project.id, // Ensure ID is included
+    slug: project.slug,
+    title: project.title,
+    date: project.published_at || project.created_at,
+    updated_at: project.updated_at || project.published_at || project.created_at,
+    tags: project.tags?.map((t: any) => t.slug) || [],
+    originalTags: project.tags?.map((t: any) => t.name) || [],
+    description: project.description || "",
+    longDescription: project.long_description || project.description || "",
+    heroImage: project.hero_image_url
+      ? project.hero_image_url.startsWith("http")
+        ? project.hero_image_url
+        : `${siteConfig.url}${project.hero_image_url}`
+      : undefined,
+    thumbnailImage: project.thumbnail_image_url || project.hero_image_url,
+    heroBlurDataURL: null,
+    thumbnailBlurDataURL: null,
+    liveUrl: project.live_url,
+    repoUrl: project.repo_url,
+    demoUrl: project.demo_url,
+    technologies: project.technologies || [],
+    isPublished: project.status === "published",
+    category: project.category,
+    featured: project.featured || false,
+    content: project.content || "",
+    readTime: project.content ? Math.ceil(project.content.split(/\s+/).length / 200) + " min read" : "N/A",
+    isBookmarked: false,
+    author: { name: authorName, url: authorUrl },
+    view_count: project.view_count || 0, // Added view_count
+  }
+}
+
+const PROJECT_SELECT_QUERY = `
+  id, slug, title, description, long_description, content, hero_image_url, thumbnail_image_url,
+  live_url, repo_url, demo_url, technologies, status, published_at, created_at, updated_at,
+  featured, category, view_count,
+  author:profiles (id, username, full_name, avatar_url),
+  tags (id, name, slug)
+`
+
+export const getAllProjectSlugs = cache(async (): Promise<string[]> => {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("projects").select("slug").eq("status", "published")
+
+  if (error) {
+    console.error("Error fetching project slugs:", error)
+    return []
+  }
+  return data.map((p) => p.slug)
+})
+
+export const getAllProjects = cache(async (includeUnpublished = false): Promise<ProjectFrontmatter[]> => {
+  const supabase = createClient()
+  let query = supabase
+    .from("projects")
+    .select(PROJECT_SELECT_QUERY)
+    .order("published_at", { ascending: false, nullsFirst: false })
+
+  if (!includeUnpublished) {
+    query = query.eq("status", "published")
+  }
+
+  const { data: projects, error } = await query
+
+  if (error) {
+    console.error("Error fetching all projects:", error)
+    return []
+  }
+  return projects.map(dbProjectToProjectFrontmatter)
+})
+
+export const getProjectBySlug = cache(async (slug: string): Promise<ProjectFrontmatter | null> => {
+  const supabase = createClient()
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT_QUERY)
+    .eq("slug", slug)
+    .single()
+
+  if (error || !project) {
+    return null
+  }
+  return dbProjectToProjectFrontmatter(project)
+})
+
+export const getFeaturedProjects = cache(async (limit = 3): Promise<ProjectFrontmatter[]> => {
+  const supabase = createClient()
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT_QUERY)
+    .eq("status", "published")
+    .eq("featured", true)
+    .order("published_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("Error fetching featured projects:", error)
+    return []
+  }
+  return projects.map(dbProjectToProjectFrontmatter)
+})
+
+export const getRelatedProjects = cache(
+  async (currentProjectSlug: string, limit = 2): Promise<ProjectFrontmatter[]> => {
+    const supabase = createClient()
+    const currentProject = await getProjectBySlug(currentProjectSlug)
+    if (!currentProject || !currentProject.tags || currentProject.tags.length === 0) {
       return []
     }
-    const dirents = fs.readdirSync(projectsDirectory, { withFileTypes: true })
-    return dirents
-      .filter((dirent) => dirent.isFile() && (dirent.name.endsWith(".mdx") || dirent.name.endsWith(".md")))
-      .map((dirent) => dirent.name.replace(/\.(mdx|md)$/, ""))
-  } catch (error) {
-    console.error("[lib/projects] Error reading project slugs:", error)
-    return []
-  }
-}
 
-export function getProjectBySlug(slug: string, includeContent = false): ProjectFrontmatter | null {
-  const fullPath = path.join(projectsDirectory, `${slug}.mdx`)
-  if (!fs.existsSync(fullPath)) {
-    return null
-  }
+    const { data: projects, error } = await supabase
+      .from("projects")
+      .select(PROJECT_SELECT_QUERY.replace("tags (id, name, slug)", "tags (name, slug)"))
+      .eq("status", "published")
+      .neq("slug", currentProjectSlug)
+      .or(`category.eq.${currentProject.category},tags.slug.in.(${currentProject.tags.map((t) => `"${t}"`).join(",")})`)
+      .order("published_at", { ascending: false })
+      .limit(limit + 5)
 
-  try {
-    const fileContents = fs.readFileSync(fullPath, "utf8")
-    const { data, content } = matter(fileContents)
-
-    if (!data.title || !data.date) {
-      console.warn(`[lib/projects] Project "${slug}" is missing required frontmatter (title or date). Skipping.`)
-      return null
+    if (error) {
+      console.error("Error fetching related projects:", error)
+      return []
     }
 
-    const wordCount = content.split(/\s+/).length
-    const readTime = Math.ceil(wordCount / 200) + " min read"
+    const related = projects
+      .map(dbProjectToProjectFrontmatter)
+      .map((project) => {
+        const commonTags = project.tags.filter((tag) => currentProject.tags.includes(tag))
+        return { ...project, commonTagsCount: commonTags.length }
+      })
+      .filter((project) => project.commonTagsCount > 0 || project.category === currentProject.category)
+      .sort((a, b) => {
+        if (b.commonTagsCount !== a.commonTagsCount) {
+          return b.commonTagsCount - a.commonTagsCount
+        }
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+      })
 
-    const projectData: ProjectFrontmatter = {
-      slug,
-      title: data.title,
-      date: data.date,
-      tags: data.tags ? (Array.isArray(data.tags) ? data.tags.map(String) : [String(data.tags)]) : [],
-      description: data.description || "",
-      longDescription: data.longDescription || data.description || "",
-      heroImage: data.heroImage && data.heroImage.trim() !== "" ? data.heroImage.trim() : null,
-      heroBlurDataURL: data.heroBlurDataURL && data.heroBlurDataURL.trim() !== "" ? data.heroBlurDataURL.trim() : null,
-      thumbnailImage:
-        data.thumbnailImage && data.thumbnailImage.trim() !== ""
-          ? data.thumbnailImage.trim()
-          : data.heroImage && data.heroImage.trim() !== ""
-            ? data.heroImage.trim()
-            : null,
-      thumbnailBlurDataURL:
-        data.thumbnailBlurDataURL && data.thumbnailBlurDataURL.trim() !== ""
-          ? data.thumbnailBlurDataURL.trim()
-          : data.heroBlurDataURL && data.heroBlurDataURL.trim() !== ""
-            ? data.heroBlurDataURL.trim()
-            : null,
-      liveUrl: data.liveUrl || null,
-      repoUrl: data.repoUrl || null,
-      lighthouseScoreImage:
-        data.lighthouseScoreImage && data.lighthouseScoreImage.trim() !== "" ? data.lighthouseScoreImage.trim() : null,
-      readTime,
-      toc: data.toc || null,
-      isPublished: data.isPublished === undefined ? true : data.isPublished,
-      category: data.category || null,
-      demoUrl: data.demoUrl || null,
-      technologies: data.technologies
-        ? Array.isArray(data.technologies)
-          ? data.technologies.map(String)
-          : [String(data.technologies)]
-        : [],
-      featured: data.featured || false, // Default to false if not specified
-      isBookmarked: data.isBookmarked || false,
-      ...(includeContent && { content }),
-    }
-    return projectData
-  } catch (error) {
-    console.error(`[lib/projects] Error processing project "${slug}":`, error)
-    return null
-  }
-}
+    return related.slice(0, limit)
+  },
+)
 
-export function getAllProjects(): ProjectFrontmatter[] {
-  const slugs = getProjectSlugs()
-  if (!slugs || slugs.length === 0) {
+export const getMostViewedProjects = cache(async (limit = 5): Promise<ProjectFrontmatter[]> => {
+  const supabase = createClient()
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT_QUERY)
+    .eq("status", "published")
+    .order("view_count", { ascending: false, nullsLast: true })
+    .limit(limit)
+
+  if (error) {
+    console.error("Error fetching most viewed projects:", error.message)
     return []
   }
-  return slugs
-    .map((slug) => getProjectBySlug(slug))
-    .filter((project): project is ProjectFrontmatter => project !== null && project.isPublished)
-    .sort((project1, project2) => new Date(project2.date).getTime() - new Date(project1.date).getTime())
-}
-
-// Option 1: Keep filtering by `featured: true` (default)
-export function getFeaturedProjects(projects: ProjectFrontmatter[], count: number): ProjectFrontmatter[] {
-  // return projects.filter((p) => p.featured && p.isPublished).slice(0, count)
-  return projects.filter((p) => p.isPublished).slice(0, count)
-}
-
-// Option 2: Show latest projects regardless of 'featured' flag (but ensure they are published)
-// export function getFeaturedProjects(projects: ProjectFrontmatter[], count: number): ProjectFrontmatter[] {
-//   return projects.filter(p => p.isPublished).slice(0, count);
-// }
-
-export function getRelatedProjects(
-  currentProjectSlug: string,
-  allProjects: ProjectFrontmatter[],
-  count = 2,
-): ProjectFrontmatter[] {
-  const currentProject = allProjects.find((project) => project.slug === currentProjectSlug)
-  if (!currentProject || !currentProject.tags || currentProject.tags.length === 0) {
-    return []
-  }
-  const related = allProjects
-    .filter((project) => project.slug !== currentProjectSlug && project.isPublished)
-    .map((project) => {
-      const commonTags = project.tags.filter((tag) => currentProject.tags.includes(tag))
-      return { ...project, commonTagsCount: commonTags.length }
-    })
-    .filter((project) => project.commonTagsCount > 0)
-    .sort((a, b) => {
-      if (b.commonTagsCount !== a.commonTagsCount) {
-        return b.commonTagsCount - a.commonTagsCount
-      }
-      return new Date(b.date).getTime() - new Date(a.date).getTime()
-    })
-  return related.slice(0, count)
-}
+  return projects.map(dbProjectToProjectFrontmatter)
+})

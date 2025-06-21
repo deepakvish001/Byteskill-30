@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, forwardRef } from "react"
+import { useState, useEffect, forwardRef, useMemo } from "react"
 import Link from "next/link"
-import { SearchIcon, Menu, X, BrainCircuit, Loader2 } from "lucide-react"
+import { SearchIcon, Menu, X, BrainCircuit, Loader2, Bell } from "lucide-react"
 import { SearchModal } from "@/components/search-modal"
 import type { PostFrontmatter } from "@/lib/posts"
 import type { ProjectFrontmatter } from "@/lib/projects"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { NotificationList } from "@/components/notifications/notification-list"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { siteConfig } from "@/lib/site-config"
@@ -16,6 +18,9 @@ import { useUser } from "@/app/contexts/UserContext"
 interface SiteHeaderProps {
   allPosts: PostFrontmatter[]
   allProjects: ProjectFrontmatter[]
+  // We can't pass initialNotifications directly here easily without making SiteHeader a server component
+  // or fetching them in layout.tsx and passing down.
+  // For now, NotificationList will fetch its own data.
 }
 
 export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, allProjects }, ref) => {
@@ -25,13 +30,40 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
   const pathname = usePathname()
   const { user, profile, isLoading: isUserLoading } = useUser()
 
-  const navLinks = [
-    { href: "/blog", label: "Blog" },
-    { href: "/projects", label: "Projects" },
-    { href: "/series", label: "Series" },
-    { href: "/tags", label: "Tags" },
-    { href: "/about", label: "About" },
-  ]
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false)
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotificationCount(0)
+      return
+    }
+    ;(async () => {
+      try {
+        const res = await fetch("/api/notifications/unread-count", {
+          cache: "no-store",
+        })
+        if (res.ok) {
+          const json = (await res.json()) as { count: number }
+          setUnreadNotificationCount(json.count)
+        }
+      } catch (e) {
+        console.error("Failed to load unread notifications", e)
+      }
+    })()
+  }, [user])
+
+  const navLinks = useMemo(
+    () => [
+      // useMemo for navLinks
+      { href: "/blog", label: "Blog" },
+      { href: "/projects", label: "Projects" },
+      { href: "/series", label: "Series" },
+      { href: "/tags", label: "Tags" },
+      { href: "/about", label: "About" },
+    ],
+    [],
+  )
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen)
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
@@ -41,7 +73,7 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
       setIsScrolled(window.scrollY > 50)
     }
     window.addEventListener("scroll", handleScroll)
-    handleScroll()
+    handleScroll() // Call on mount
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
@@ -50,6 +82,26 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
 
   const linkFocusClasses =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 rounded-md"
+
+  const handleNotificationUpdate = () => {
+    // This function is called when notifications are read inside the popover
+    // Re-fetch unread count
+    if (user) {
+      ;(async () => {
+        try {
+          const res = await fetch("/api/notifications/unread-count", {
+            cache: "no-store",
+          })
+          if (res.ok) {
+            const json = (await res.json()) as { count: number }
+            setUnreadNotificationCount(json.count)
+          }
+        } catch (e) {
+          console.error("Failed to load unread notifications", e)
+        }
+      })()
+    }
+  }
 
   return (
     <>
@@ -106,12 +158,42 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
           >
             <SearchIcon className="w-5 h-5" />
           </Button>
+
           {isUserLoading ? (
             <div className="flex items-center justify-center h-10 w-10">
+              {" "}
+              {/* Placeholder for UserNav width */}
               <Loader2 className="h-5 w-5 animate-spin text-neutral-400" />
             </div>
-          ) : user ? (
-            <UserNav user={user} profile={profile} />
+          ) : user && profile ? (
+            <>
+              <Popover open={isNotificationPopoverOpen} onOpenChange={setIsNotificationPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="View notifications"
+                    className="text-neutral-400 hover:text-green-400 hover:bg-neutral-800 relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 rounded-md"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unreadNotificationCount > 0 && (
+                      <span className="absolute top-1 right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 border-neutral-700 bg-neutral-850 shadow-xl" align="end">
+                  <NotificationList
+                    userId={user.id}
+                    onAllRead={handleNotificationUpdate}
+                    onNotificationRead={handleNotificationUpdate}
+                  />
+                </PopoverContent>
+              </Popover>
+              <UserNav user={user} profile={profile} />
+            </>
           ) : (
             <div className="hidden md:flex items-center space-x-2">
               <Button asChild variant="outline" size="sm" className={outlineButtonClasses}>
@@ -140,7 +222,7 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
         <div
           className={cn(
             "md:hidden fixed inset-0 z-40 bg-neutral-900/95 backdrop-blur-sm p-6 transition-all duration-300 ease-in-out",
-            isScrolled ? "top-[61px]" : "top-[77px]",
+            isScrolled ? "top-[61px]" : "top-[77px]", // Adjust based on scrolled header height
           )}
         >
           <nav className="flex flex-col space-y-6 text-lg">
@@ -154,7 +236,7 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
                   pathname === link.href || (pathname.startsWith(link.href) && link.href !== "/")
                     ? "text-green-400 bg-green-700/20"
                     : "text-neutral-200",
-                  linkFocusClasses, // Apply to mobile nav links too
+                  linkFocusClasses,
                 )}
               >
                 {link.label}
@@ -162,15 +244,21 @@ export const SiteHeader = forwardRef<HTMLElement, SiteHeaderProps>(({ allPosts, 
             ))}
             {!isUserLoading && !user && (
               <div className="flex flex-col space-y-4 pt-4 border-t border-neutral-700/50">
-                <Button asChild variant="outline" className={cn("w-full", outlineButtonClasses)}>
-                  <Link href="/login" onClick={closeMobileMenu}>
-                    Login
-                  </Link>
+                <Button
+                  asChild
+                  variant="outline"
+                  className={cn("w-full", outlineButtonClasses)}
+                  onClick={closeMobileMenu}
+                >
+                  <Link href="/login">Login</Link>
                 </Button>
-                <Button asChild variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                  <Link href="/signup" onClick={closeMobileMenu}>
-                    Sign Up
-                  </Link>
+                <Button
+                  asChild
+                  variant="default"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  onClick={closeMobileMenu}
+                >
+                  <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
             )}

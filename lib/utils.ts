@@ -15,6 +15,36 @@ export function formatDate(dateString: string) {
   })
 }
 
+// Human-friendly relative-time helper (e.g. "5 min ago", "yesterday")
+export function timeAgo(input: string | number | Date) {
+  const date = typeof input === "string" || typeof input === "number" ? new Date(input) : input
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+
+  const intervals: [number, Intl.RelativeTimeFormatUnit][] = [
+    [60, "second"],
+    [60, "minute"],
+    [24, "hour"],
+    [7, "day"],
+    [4.34524, "week"], // avg. weeks per month
+    [12, "month"],
+    [Number.POSITIVE_INFINITY, "year"],
+  ]
+
+  let value = seconds
+  let unit: Intl.RelativeTimeFormatUnit = "second"
+
+  for (const [divisor, nextUnit] of intervals) {
+    if (Math.abs(value) < divisor) {
+      unit = nextUnit
+      break
+    }
+    value /= divisor
+  }
+
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
+  return rtf.format(-Math.round(value), unit)
+}
+
 // New utility function
 export function absoluteUrl(path: string) {
   // Ensure path starts with a slash if it's relative

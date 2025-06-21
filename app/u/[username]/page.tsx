@@ -1,7 +1,20 @@
 import Link from "next/link"
 import { getPublicProfileByUsername } from "@/app/me/profile/actions"
 import { getProjectsByAuthorUsername } from "@/app/projects/actions"
-import { Globe, CalendarDays, Briefcase, Newspaper } from "lucide-react"
+import {
+  Globe,
+  CalendarDays,
+  Briefcase,
+  Newspaper,
+  MapPin,
+  Github,
+  Twitter,
+  Linkedin,
+  Sparkles,
+  Brain,
+  Building,
+  Medal,
+} from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -9,10 +22,10 @@ import { getPostsByAuthorUsername } from "@/app/blog/actions"
 import { ArticleCard } from "@/components/article-card"
 import { ProjectCard } from "@/components/project-card"
 import { PaginationControls } from "@/components/pagination-controls"
-// No need to import specific ProfilePostFrontmatter or ProfileProjectFrontmatter from lib/types here
-// as the cards now expect ArticleCardDisplayInfo and ProjectCardDisplayInfo,
-// and the server actions return full PostFrontmatter/ProjectFrontmatter which are compatible.
-import type { PostFrontmatter, ProjectFrontmatter } from "@/lib/types"
+import type { PostFrontmatter, ProjectFrontmatter, UserProfile } from "@/lib/types"
+import { Badge } from "@/components/ui/badge"
+import { siteConfig } from "@/lib/site-config"
+import { JsonLd } from "@/components/json-ld"
 
 interface PublicProfilePageProps {
   params: {
@@ -25,15 +38,43 @@ interface PublicProfilePageProps {
 }
 
 export async function generateMetadata({ params }: PublicProfilePageProps) {
-  const { profile } = await getPublicProfileByUsername(params.username)
+  const { profile } = (await getPublicProfileByUsername(params.username)) as {
+    profile: Partial<UserProfile> | null
+    error?: string
+  }
+
   if (!profile) {
     return {
       title: "User Not Found",
     }
   }
+
+  const name = profile.full_name || profile.username || "User"
+  const title = `${name}'s Profile${profile.job_title ? ` | ${profile.job_title}` : ""} | ${siteConfig.name}`
+  const description = profile.bio || `View the public profile, projects, and posts by ${name} on ${siteConfig.name}.`
+  const imageUrl = profile.avatar_url || siteConfig.logo
+
   return {
-    title: `${profile.full_name || profile.username}'s Profile`,
-    description: `View the public profile and contributions of ${profile.full_name || profile.username}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      username: profile.username,
+      firstName: profile.full_name?.split(" ")[0],
+      lastName: profile.full_name?.split(" ").slice(1).join(" "),
+      url: `${siteConfig.url}/u/${profile.username}`,
+      images: imageUrl ? [{ url: imageUrl, alt: `${name}'s avatar` }] : [],
+      siteName: siteConfig.name,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      creator: profile.twitter_username ? `@${profile.twitter_username}` : siteConfig.links.twitter.split("/").pop(),
+      images: imageUrl ? [imageUrl] : [],
+    },
   }
 }
 
@@ -41,7 +82,10 @@ const ITEMS_PER_PAGE = 6
 
 export default async function PublicProfilePage({ params: routeParams, searchParams }: PublicProfilePageProps) {
   const { username } = routeParams
-  const { profile, error: profileError } = await getPublicProfileByUsername(username)
+  const { profile, error: profileError } = (await getPublicProfileByUsername(username)) as {
+    profile: UserProfile | null
+    error?: string
+  }
 
   if (profileError === "User not found." || !profile) {
     return (
@@ -101,120 +145,256 @@ export default async function PublicProfilePage({ params: routeParams, searchPar
 
   const hasContent = postsData.posts.length > 0 || projectsData.projects.length > 0
 
+  const personSchema = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: profile.full_name || profile.username,
+    alternateName: profile.username,
+    url: `${siteConfig.url}/u/${profile.username}`,
+    image: profile.avatar_url,
+    description: profile.bio,
+    jobTitle: profile.job_title,
+    worksFor: profile.company ? { "@type": "Organization", name: profile.company } : undefined,
+    address: profile.location ? { "@type": "PostalAddress", addressLocality: profile.location } : undefined,
+    sameAs: [
+      profile.website,
+      profile.github_username ? `https://github.com/${profile.github_username}` : undefined,
+      profile.twitter_username ? `https://twitter.com/${profile.twitter_username}` : undefined,
+      profile.linkedin_url,
+    ].filter(Boolean),
+    knowsAbout: [...(profile.skills || []), ...(profile.interests || [])].filter(Boolean),
+    mainEntityOfPage: {
+      "@type": "ProfilePage",
+      "@id": `${siteConfig.url}/u/${profile.username}`,
+    },
+  }
+
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8 md:py-16">
-      <div className="flex flex-col items-center md:flex-row md:items-start gap-6 md:gap-8 mb-10">
-        <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-neutral-700 shadow-lg">
-          <AvatarImage src={profile.avatar_url || ""} alt={profile.full_name || profile.username || "User Avatar"} />
-          <AvatarFallback className="text-4xl bg-neutral-700 text-neutral-300">
-            {getInitials(profile.full_name || profile.username)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="text-center md:text-left flex-grow pt-2">
-          <h1 className="text-3xl sm:text-4xl font-bold text-neutral-100">{profile.full_name || "Anonymous User"}</h1>
-          {profile.username && <p className="text-xl text-sky-400">@{profile.username}</p>}
-          {profile.created_at && (
-            <div className="mt-2 flex items-center justify-center md:justify-start text-sm text-neutral-400">
-              <CalendarDays className="mr-1.5 h-4 w-4" />
-              Joined {new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+    <>
+      <JsonLd data={personSchema} />
+      <div className="container mx-auto max-w-5xl px-4 py-8 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-12">
+          <div className="md:col-span-1 flex flex-col items-center md:items-start text-center md:text-left">
+            <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-neutral-700 shadow-lg mb-4">
+              <AvatarImage
+                src={profile.avatar_url || ""}
+                alt={profile.full_name || profile.username || "User Avatar"}
+              />
+              <AvatarFallback className="text-4xl bg-neutral-700 text-neutral-300">
+                {getInitials(profile.full_name || profile.username)}
+              </AvatarFallback>
+            </Avatar>
+            <h1 className="text-3xl sm:text-4xl font-bold text-neutral-100">{profile.full_name || "Anonymous User"}</h1>
+            {profile.username && <p className="text-xl text-sky-400 mb-1">@{profile.username}</p>}
+
+            <div className="mt-2 flex items-center justify-center md:justify-start gap-2 text-amber-400">
+              <Medal className="h-5 w-5" />
+              <span className="text-lg font-semibold">{profile.reputation_score || 0} Reputation</span>
             </div>
-          )}
-          {profile.website && (
-            <div className="mt-1 flex items-center justify-center md:justify-start text-sm text-neutral-400">
-              <Globe className="mr-1.5 h-4 w-4" />
-              <a
-                href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-400 hover:underline"
-              >
-                {profile.website.replace(/^https?:\/\//, "")}
-              </a>
+
+            <div className="mt-3 text-md text-neutral-300 space-y-0.5">
+              {profile.job_title && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Briefcase className="mr-2 h-4 w-4 flex-shrink-0 text-neutral-400" />
+                  <span>{profile.job_title}</span>
+                </div>
+              )}
+              {profile.company && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Building className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span>{profile.company}</span>
+                </div>
+              )}
             </div>
-          )}
-          {profile.bio && (
-            <p className="mt-4 text-neutral-300 text-center md:text-left whitespace-pre-wrap max-w-prose">
-              {profile.bio}
-            </p>
-          )}
+
+            <div className="mt-4 space-y-1.5 text-sm text-neutral-400">
+              {profile.location && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span>{profile.location}</span>
+                </div>
+              )}
+              {profile.created_at && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <CalendarDays className="mr-2 h-4 w-4 flex-shrink-0" />
+                  Joined {new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </div>
+              )}
+              {profile.website && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Globe className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <a
+                    href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 hover:underline truncate"
+                  >
+                    {profile.website.replace(/^https?:\/\//, "")}
+                  </a>
+                </div>
+              )}
+              {profile.github_username && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Github className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <a
+                    href={`https://github.com/${profile.github_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 hover:underline"
+                  >
+                    {profile.github_username}
+                  </a>
+                </div>
+              )}
+              {profile.twitter_username && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Twitter className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <a
+                    href={`https://twitter.com/${profile.twitter_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 hover:underline"
+                  >
+                    @{profile.twitter_username}
+                  </a>
+                </div>
+              )}
+              {profile.linkedin_url && (
+                <div className="flex items-center justify-center md:justify-start">
+                  <Linkedin className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <a
+                    href={profile.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 hover:underline truncate"
+                  >
+                    LinkedIn Profile
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            {profile.bio && (
+              <section className="mb-8">
+                <h2 className="text-xl font-semibold text-neutral-100 mb-2">About Me</h2>
+                <p className="text-neutral-300 whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
+                  {profile.bio}
+                </p>
+              </section>
+            )}
+
+            {profile.skills && profile.skills.length > 0 && (
+              <section className="mb-8">
+                <h2 className="text-xl font-semibold text-neutral-100 mb-3 flex items-center">
+                  <Sparkles className="mr-2 h-5 w-5 text-sky-400" /> Skills
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills.map((skill) => (
+                    <Badge key={skill} variant="secondary" className="bg-sky-700/20 border-sky-500/40 text-sky-300">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {profile.interests && profile.interests.length > 0 && (
+              <section>
+                <h2 className="text-xl font-semibold text-neutral-100 mb-3 flex items-center">
+                  <Brain className="mr-2 h-5 w-5 text-green-400" /> Interests
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {profile.interests.map((interest) => (
+                    <Badge
+                      key={interest}
+                      variant="outline"
+                      className="border-green-500/40 text-green-300 bg-green-700/10"
+                    >
+                      {interest}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
+
+        {(hasContent || postsData.error || projectsData.error) && <Separator className="my-10 bg-neutral-700" />}
+
+        {postsData.posts.length > 0 || postsData.error ? (
+          <section id="user-posts" className="mb-12">
+            <h2 className="text-2xl font-semibold text-neutral-100 mb-6 flex items-center">
+              <Newspaper className="mr-3 h-6 w-6 text-sky-400" />
+              Recent Posts by {profile.full_name || profile.username}
+            </h2>
+            {postsData.error && <p className="text-destructive">Could not load posts: {postsData.error}</p>}
+            {postsData.posts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {postsData.posts.map((post) => (
+                    <ArticleCard key={post.slug} post={post as PostFrontmatter} />
+                  ))}
+                </div>
+                {postsData.totalPages > 1 && (
+                  <PaginationControls
+                    currentPage={postsData.currentPage}
+                    totalPages={postsData.totalPages}
+                    pageParamName="postsPage"
+                    className="mt-8"
+                  />
+                )}
+              </>
+            ) : (
+              !postsData.error && (
+                <p className="text-neutral-500">
+                  {profile.full_name || profile.username} hasn't published any posts yet.
+                </p>
+              )
+            )}
+          </section>
+        ) : null}
+
+        {projectsData.projects.length > 0 || projectsData.error ? (
+          <section id="user-projects">
+            <h2 className="text-2xl font-semibold text-neutral-100 mb-6 flex items-center">
+              <Briefcase className="mr-3 h-6 w-6 text-sky-400" />
+              Projects by {profile.full_name || profile.username}
+            </h2>
+            {projectsData.error && <p className="text-destructive">Could not load projects: {projectsData.error}</p>}
+            {projectsData.projects.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {projectsData.projects.map((project) => (
+                    <ProjectCard key={project.slug} project={project as ProjectFrontmatter} />
+                  ))}
+                </div>
+                {projectsData.totalPages > 1 && (
+                  <PaginationControls
+                    currentPage={projectsData.currentPage}
+                    totalPages={projectsData.totalPages}
+                    pageParamName="projectsPage"
+                    className="mt-8"
+                  />
+                )}
+              </>
+            ) : (
+              !projectsData.error && (
+                <p className="text-neutral-500">
+                  {profile.full_name || profile.username} hasn't published any projects yet.
+                </p>
+              )
+            )}
+          </section>
+        ) : null}
+
+        {!hasContent && !postsData.error && !projectsData.error && (
+          <div className="text-center py-12">
+            <p className="text-xl text-neutral-500">This user hasn't shared any public content yet.</p>
+          </div>
+        )}
       </div>
-
-      {hasContent && <Separator className="my-10 bg-neutral-700" />}
-
-      {postsData.posts.length > 0 || postsData.error ? (
-        <section id="user-posts" className="mb-12">
-          <h2 className="text-2xl font-semibold text-neutral-100 mb-6 flex items-center">
-            <Newspaper className="mr-3 h-6 w-6 text-sky-400" />
-            Recent Posts by {profile.full_name || profile.username}
-          </h2>
-          {postsData.error && <p className="text-destructive">Could not load posts: {postsData.error}</p>}
-          {postsData.posts.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {postsData.posts.map((post) => (
-                  // PostFrontmatter is assignable to ArticleCardDisplayInfo
-                  <ArticleCard key={post.slug} post={post as PostFrontmatter} />
-                ))}
-              </div>
-              {postsData.totalPages > 1 && (
-                <PaginationControls
-                  currentPage={postsData.currentPage}
-                  totalPages={postsData.totalPages}
-                  pageParamName="postsPage"
-                  className="mt-8"
-                />
-              )}
-            </>
-          ) : (
-            !postsData.error && (
-              <p className="text-neutral-500">
-                {profile.full_name || profile.username} hasn't published any posts yet.
-              </p>
-            )
-          )}
-        </section>
-      ) : null}
-
-      {projectsData.projects.length > 0 || projectsData.error ? (
-        <section id="user-projects">
-          <h2 className="text-2xl font-semibold text-neutral-100 mb-6 flex items-center">
-            <Briefcase className="mr-3 h-6 w-6 text-sky-400" />
-            Projects by {profile.full_name || profile.username}
-          </h2>
-          {projectsData.error && <p className="text-destructive">Could not load projects: {projectsData.error}</p>}
-          {projectsData.projects.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projectsData.projects.map((project) => (
-                  // ProjectFrontmatter is assignable to ProjectCardDisplayInfo
-                  <ProjectCard key={project.slug} project={project as ProjectFrontmatter} />
-                ))}
-              </div>
-              {projectsData.totalPages > 1 && (
-                <PaginationControls
-                  currentPage={projectsData.currentPage}
-                  totalPages={projectsData.totalPages}
-                  pageParamName="projectsPage"
-                  className="mt-8"
-                />
-              )}
-            </>
-          ) : (
-            !projectsData.error && (
-              <p className="text-neutral-500">
-                {profile.full_name || profile.username} hasn't published any projects yet.
-              </p>
-            )
-          )}
-        </section>
-      ) : null}
-
-      {!hasContent && !postsData.error && !projectsData.error && (
-        <div className="text-center py-12">
-          <p className="text-xl text-neutral-500">This user hasn't shared any public content yet.</p>
-        </div>
-      )}
-    </div>
+    </>
   )
 }
